@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Hello World!</title>
+    <script type="text/javascript">
+      window.$ = window.jQuery = require(__dirname+'/jslib/jquery-2.2.1.min.js');
+      window.Highcharts = require(__dirname+'/jslib/Highcharts/highcharts.src.js');
+    </script>
+    
+</head>
+  <body>
+    <h1>Hello World!</h1>
+    We are using io.js <script>document.write(process.version)</script>
+    and Electron <script>document.write(process.versions['electron'])</script>.
+
+    <script src="client.js"></script>
+
+    <div id="div1" style="margin-left: 40px; margin-top: 10px;">
+    </div>
+
+    <div id="div2" style="margin-left: 40px; margin-top: 10px;">
+    Hello World
+    <br/>
+    <button id="btn">click me</button>
+    </div>
+
+    <div id="holder" style="height: 150px; background-color: #ccc;">
+  Drag your file here
+</div>
+
+
+    <script>
+    /*
+    $('#div1').highcharts({
+        chart: {
+            backgroundColor: '#FCFFC5',
+            type: 'line'
+        },
+        xAxis: {
+            categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        },
+        yAxis: {
+        },
+        legend: {
+            layout: 'vertical',
+            backgroundColor: '#FFFFFF',
+            floating: true,
+            align: 'left',
+            x: 100,
+            verticalAlign: 'top',
+            y: 70
+        },
+        tooltip: {
+            formatter: function () {
+                return '<b>' + this.series.name + '</b><br/>' +
+                    this.x + ': ' + this.y;
+            }
+        },
+        plotOptions: {
+        },
+        series: [{
+            data: [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4, 194.1, 95.6, 54.4]
+        }]
+    });*/
+    // creating connection to a default haskell server
+    /*
+        var ws = new WebSocket("ws://localhost:8080/");
+        ws.onmessage = function (m) {
+          console.log(m.data); 
+        }
+
+
+      var hl = document.getElementById('btn');
+      
+      hl.onclick = function (e) {
+        // e.preventDefault();
+        // var file = e.dataTransfer.files[0];
+        console.log('Clicked the button', e);
+        
+        cmd = {};
+        cmd.cmd = "Click";
+        cmd.data = {};
+        cmd.data.id = "btn";
+
+        //ws.send(JSON.stringify(cmd));
+
+        return false;
+      };*/
+
+      
+        var holder = document.getElementById('holder');
+  holder.ondragover = function () {
+    return false;
+  };
+  holder.ondragleave = holder.ondragend = function () {
+    return false;
+  };
+  holder.ondrop = function (e) {
+    e.preventDefault();
+    var file = e.dataTransfer.files[0];
+    console.log('File you dragged here is', file.path);
+    console.log(file);
+
+        cmd = {};
+        cmd.cmd = "ChooseFile";
+        cmd.data = {};
+        cmd.data.name = file.name;
+        cmd.data.path = file.path;
+
+        ws.send(JSON.stringify(cmd));
+
+    return false;
+  };
+
+    </script>
+
+
+
+
+  </body>
+</html>
