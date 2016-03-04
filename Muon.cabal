@@ -16,9 +16,15 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib
+                      , SSCSV 
   build-depends:       base >= 4.7 && < 5
                       , websockets
                       , aeson
+                      , cassava
+                      , vector
+                      , text
+                      , bytestring
+                      , time
   default-language:    Haskell2010
 
 executable muon
