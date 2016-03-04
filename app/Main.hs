@@ -31,6 +31,7 @@ commandsList =
     , (":time",     ("show current time",  (\x -> liftIO getCurrentTime >>= outputStrLn . show)) )
     , (":env",      ("show Environment", cmdEnv) )
     , (":commands", ("show all available commands", cmdCommandsHelp) )
+    , (":tr", ("test run with sample file", (\x -> liftIO (testRun "src/sample-l.csv") >>= outputStrLn . show)) )
     ]
 
 commands = Map.fromList commandsList
@@ -40,6 +41,9 @@ cmdCommandsHelp :: t -> InputT IO ()
 cmdCommandsHelp _ = do 
     mapM_ (outputStrLn . comb) commandsList
     where comb (s, (h, _) ) = s ++ " -- " ++ h
+
+-- cmdTR :: t -> InputT IO ()
+-- cmdTR 
 
 cmdEnv :: t -> InputT IO ()
 cmdEnv _ = do 
@@ -64,7 +68,11 @@ loop = do
        Just ":help"     -> do outputStrLn helpMsg >> loop
        Just input       -> let c = Map.lookup input commands
                            in case c of 
-                                (Just cmd) -> (snd cmd) 1 >> loop
+                                (Just cmd) -> do t1 <- liftIO getCurrentTime
+                                                 (snd cmd) 1 
+                                                 t2 <- liftIO getCurrentTime
+                                                 outputStrLn $ "Time elapsed (ps) " ++ show (diffUTCTime t2 t1)
+                                                 loop
                                 Nothing -> do outputStrLn unknownMsg >> loop
 
                         

@@ -2,6 +2,7 @@
 
 module SSCSV
     ( 
+        testRun
     ) where
 
 --      So, for the generic CSV loading we want to do the following:
@@ -22,7 +23,12 @@ import Data.Time
 import Text.Read
 import Data.Text.Read
 
+import Data.Time.Clock
+
 import GHC.Exts
+import Quark.Base.Data
+
+-- import qualified Data.Map as Map
 
 newtype DefaultToZero = DefaultToZero Int deriving (Show)
 
@@ -128,17 +134,13 @@ testRun fname = do
     let pf = processFile encoders f
     let pfl = convertFileToList pf
     -- print pfl
-    let output = [ [the globalRegion, the region, sum' amount]
-            | [ buckets, lifetime, opType, created, 
-                subbucket, subregion, opty, 
-                salesteam, product, amount, stage, 
-                resID, partnerLevel, reseller, 
-                globalRegion, region, closed, dealSize] <- pfl
-            , then group by (globalRegion, region) using groupWith ]
+    -- let output = aggregateData pfl
+    let output = aggregateData pfl
     return output
 
 
 sum' (x:xs) = Prelude.foldr (\acc y -> acc + y) x xs
+
 
 aggregateData ls = [ [the globalRegion, sum' amount]
             | [ buckets, lifetime, opType, created, 
@@ -147,6 +149,10 @@ aggregateData ls = [ [the globalRegion, sum' amount]
                 resID, partnerLevel, reseller, 
                 globalRegion, region, closed, dealSize] <- ls
             , then group by globalRegion using groupWith ]
+
+
+-- Let's try to write this simple aggregation for vector types
+-- processAggr hm gix six line = 
 
 
 -- ****************************************************************************************************************
