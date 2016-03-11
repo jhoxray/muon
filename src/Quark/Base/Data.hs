@@ -69,3 +69,25 @@ rankN :: (forall n. Num n => n -> n) -> (Int, Double)
 rankN f = (f 1, f 1.0)
 
 -}
+
+-- ******************************************************************************************************************************************
+-- Smart in memory data structures
+-- ******************************************************************************************************************************************
+{-
+    We are going to start with converting csv-like table to the collection of Maps and optimized (int-based) table.
+    Maps will be used for filtering (as they only have unique values stored), table - for map/reduce
+    In the table - we will change all strings to ints 
+-}
+
+
+
+
+
+
+
+
+
+
+
+
+

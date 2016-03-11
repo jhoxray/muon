@@ -2,7 +2,15 @@
 
 module SSCSV
     ( 
-        testRun
+        testRun,
+        encoders,
+        loadToMemory,
+        processFile,
+        convertFileToList,
+        aggregateData,
+        processAggrM,
+        aggrMapM,
+        QDatabase
     ) where
 
 --      So, for the generic CSV loading we want to do the following:
@@ -28,7 +36,8 @@ import Data.Time.Clock
 import GHC.Exts
 import Quark.Base.Data
 
--- import qualified Data.Map as Map
+import qualified Data.HashMap as Map
+import Data.Hashable
 
 newtype DefaultToZero = DefaultToZero Int deriving (Show)
 
@@ -64,6 +73,10 @@ signumCSField (Double x) = Double (signum x)
 signumCSField (Int x) = Int (signum x)
 signumCSField x = x
 
+
+instance Hashable CSField where
+    hash (CSString s) = hash s
+    hashWithSalt k (CSString s) = hashWithSalt k s
 
 instance  Num CSField  where
     (+) = plusCSField
@@ -108,6 +121,10 @@ myOptions = defaultDecodeOptions {
       decDelimiter = fromIntegral (ord ';')
     }
 
+
+type QRecord = V.Vector CSField
+type QDatabase = V.Vector QRecord
+
 -- read csv file into memory using cassava - rethink whether we need it?
 loadToMemory :: FilePath -> HasHeader -> IO (Either String (V.Vector (V.Vector Text)))
 loadToMemory fp hh = decodeWith myOptions hh <$> BL.readFile fp
@@ -119,11 +136,11 @@ encoders = V.fromList [toCSString, toCSInt, toCSString, toCSDate, toCSString, to
 
 
 -- "multiply" a list of encoders by a line from a csv file, converting it according to encoders
-processLine :: V.Vector (Text -> CSField) -> V.Vector Text -> V.Vector CSField
+processLine :: V.Vector (Text -> CSField) -> V.Vector Text -> QRecord
 processLine enc l = V.zipWith ($) enc l
 
 -- process the whole file: basically, chain loadToMemory with processFile and we should have what we need
-processFile :: V.Vector (Text -> CSField) -> V.Vector (V.Vector Text) -> V.Vector (V.Vector CSField)
+processFile :: V.Vector (Text -> CSField) -> V.Vector (V.Vector Text) -> QDatabase
 processFile enc f = V.map (processLine enc) f
 
 convertFileToList :: V.Vector (V.Vector a) -> [[a]]
@@ -142,17 +159,39 @@ testRun fname = do
 sum' (x:xs) = Prelude.foldr (\acc y -> acc + y) x xs
 
 
-aggregateData ls = [ [the globalRegion, sum' amount]
+aggregateData ls = [ [the globalRegion, the region, the subregion, sum' amount]
             | [ buckets, lifetime, opType, created, 
                 subbucket, subregion, opty, 
                 salesteam, product, amount, stage, 
                 resID, partnerLevel, reseller, 
                 globalRegion, region, closed, dealSize] <- ls
-            , then group by globalRegion using groupWith ]
+            , then group by (globalRegion, region, subregion) using groupWith ]
 
 
 -- Let's try to write this simple aggregation for vector types
--- processAggr hm gix six line = 
+aggrMap = Map.fromList [(CSString "dummy", Double 0)]
+aggrMapM = Map.fromList [( (CSString "dummy",CSString "dummy",CSString "dummy"),  Double 0)]
+
+processAggr n m amap line = 
+    let x = line V.! n
+        y = line V.! m
+    in Map.insertWith (+) x y amap
+
+processAggrM n m l k amap line = 
+    let x = line V.! n
+        y = line V.! m
+        z = line V.! l
+        w = line V.! k
+    in Map.insertWith (+) (x,y,z) w amap
+
+-- V.foldl' (\acc x -> processAggrM 14 15 5 9 acc x) aggrMapM pf 
+-- ^ in multidimension (tested with data here), foldl' is the fastest and uses less memory... 4x the aggregate!!!
+
+
+processAggr1 n m fl = V.foldl (\acc x -> processAggr n m acc x) aggrMap fl  
+processAggrR n m fl = V.foldr (\x acc -> processAggr n m acc x) aggrMap fl  
+processAggr1' n m fl = V.foldl' (\acc x -> processAggr n m acc x) aggrMap fl  
+processAggrR' n m fl = V.foldr' (\x acc -> processAggr n m acc x) aggrMap fl  -- FASTEST!!! (20% than aggregate, 20% less memory!!) - on ONE dimension
 
 
 -- ****************************************************************************************************************

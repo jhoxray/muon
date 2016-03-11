@@ -15,9 +15,12 @@ import Data.Time.Clock
 import System.Info
 import System.Environment
 
+import Data.Csv
+
 import Control.Monad.IO.Class -- liftIO !!!
 
 import qualified Data.Map as Map
+import qualified Data.Vector as V
 
 import SSCSV
 
@@ -32,10 +35,36 @@ commandsList =
     , (":env",      ("show Environment", cmdEnv) )
     , (":commands", ("show all available commands", cmdCommandsHelp) )
     , (":tr", ("test run with sample file", (\x -> liftIO (testRun "src/sample-l.csv") >>= outputStrLn . show)) )
+    , (":runList", ("run aggregation via list generalized comprehensions", cmdListCompRun) )
+    , (":runVecR", ("run aggregation via custom vector foldr'", cmdVectorR') )
+    , (":runVecL", ("run aggregation via custom vector foldl'", cmdVectorL') )
     ]
 
 commands = Map.fromList commandsList
 prompt = "hs>> "
+
+cmdLoadFile :: IO QDatabase
+cmdLoadFile = do 
+    (Right f) <- loadToMemory "src/sample-l.csv" HasHeader
+    let pf = processFile encoders f
+    return pf
+
+cmdVectorR' :: QDatabase -> InputT IO ()
+cmdVectorR' db = 
+    let output = V.foldr' (\ x acc -> processAggrM 14 15 5 9 acc x) aggrMapM db
+    in outputStrLn $ show output
+
+cmdVectorL' :: QDatabase -> InputT IO ()
+cmdVectorL' db = 
+    let output = V.foldl' (\acc x -> processAggrM 14 15 5 9 acc x) aggrMapM db
+    in outputStrLn $ show output
+
+
+cmdListCompRun :: QDatabase -> InputT IO ()
+cmdListCompRun db = 
+    let pfl = convertFileToList db
+        output = aggregateData pfl
+    in outputStrLn $ show output
 
 cmdCommandsHelp :: t -> InputT IO ()
 cmdCommandsHelp _ = do 
@@ -59,22 +88,24 @@ cmdSysinfo _ = do
     outputStrLn $ show compilerVersion
 
 -- main loop, processing commands
-loop :: InputT IO ()
-loop = do
+loop :: QDatabase -> InputT IO ()
+loop db = do
    minput <- getInputLine prompt
    case minput of
        Nothing -> return ()
        Just ":quit"     -> return ()
-       Just ":help"     -> do outputStrLn helpMsg >> loop
+       Just ":help"     -> outputStrLn helpMsg >> loop db
+       Just ":load"     -> liftIO cmdLoadFile >>= loop
+                               
        Just input       -> let c = Map.lookup input commands
                            in case c of 
                                 (Just cmd) -> do t1 <- liftIO getCurrentTime
-                                                 (snd cmd) 1 
+                                                 (snd cmd) db
                                                  t2 <- liftIO getCurrentTime
                                                  outputStrLn $ "Time elapsed (ps) " ++ show (diffUTCTime t2 t1)
-                                                 loop
-                                Nothing -> do outputStrLn unknownMsg >> loop
+                                                 loop db
+                                Nothing -> outputStrLn unknownMsg >> loop db
 
                         
 main :: IO ()
-main = runInputT defaultSettings loop
+main = runInputT defaultSettings (loop (V.fromList [V.fromList []]))
