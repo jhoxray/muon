@@ -21,11 +21,14 @@ import System.Environment
 
 import Data.Csv
 
+import Control.DeepSeq
+
 import Control.Monad.IO.Class -- liftIO !!!
 
 -- import qualified Data.Map as Map
 import qualified Data.HashMap as Map
 import qualified Data.Vector as V
+import qualified Data.Vector.Generic as G
 
 import Quark.Base.Data
 import Quark.Base.Column
@@ -46,6 +49,7 @@ commandsList =
     , (":runList", ("run aggregation via list generalized comprehensions", cmdListCompRun) )
     , (":runVecR", ("run aggregation via custom vector foldr'", cmdVectorR') )
     , (":runVecL", ("run aggregation via custom vector foldl'", cmdVectorL') )
+    , (":runColumn", ("run aggregation via column based storage", cmdColumnRun) )
     ]
 
 commands = Map.fromList commandsList
@@ -69,16 +73,24 @@ cmdVectorL' db =
 
 
 cmdListCompRun :: QDatabase -> InputT IO ()
-cmdListCompRun db = 
-    let pfl = convertFileToList db
-        output = aggregateData pfl
-    in outputStrLn $ show output
+cmdListCompRun db = do
+        let pfl = convertFileToList $! db
+        t1 <- liftIO getCurrentTime
+        let output = aggregateData pfl
+        outputStrLn $ show output
+        t2 <- liftIO getCurrentTime
+        outputStrLn $ "Time elapsed in List: " ++ show (diffUTCTime t2 t1)
 
 cmdColumnRun :: QDatabase -> InputT IO ()    
-cmdColumnRun db = 
-  let (reg, _, am) = convertDB' db
-      output = vfold (+) (Map.fromList []) reg am
-  in outputStrLn $ show output
+cmdColumnRun db = do
+      let (reg, subreg, am) = convertDB' db
+      outputStrLn $ show (G.length reg, G.length am, G.length subreg)
+      t1 <- liftIO getCurrentTime
+      let output = vfold2 (+) (Map.fromList []) reg subreg am
+      t2 <- liftIO $ output `deepseq` getCurrentTime
+      outputStrLn $ show output
+      -- t2 <- liftIO getCurrentTime
+      outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)
 
 cmdCommandsHelp :: t -> InputT IO ()
 cmdCommandsHelp _ = do 
@@ -113,9 +125,9 @@ loop db = do
                                
        Just input       -> let c = Map.lookup input commands
                            in case c of 
-                                (Just cmd) -> do t1 <- liftIO $ getSystemTime
+                                (Just cmd) -> do t1 <- liftIO getCurrentTime
                                                  (snd cmd) db
-                                                 t2 <- liftIO $ getSystemTime
+                                                 t2 <- liftIO getCurrentTime
                                                  -- liftIO $ fprint (timeSpecs % "\n") t1 t2
                                                  outputStrLn $ "Time elapsed: " ++ show (diffUTCTime t2 t1)
                                                  -- outputStrLn $ "Time elapsed (ps) " ++ show (t2 - t1)

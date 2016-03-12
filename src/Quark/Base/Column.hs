@@ -6,7 +6,7 @@
 
 module Quark.Base.Column
     ( 
-        CInt, CDouble, CWord, CBool, CText, GenericColumn, CTable, pfold, vfold
+        CInt, CDouble, CWord, CBool, CText, GenericColumn, CTable, pfold, vfold, vfold2
     ) where
 
 import Data.Int
@@ -79,6 +79,8 @@ pfold f z xxs yys = Map.insertWith f x y (pfold f z xs ys)
 
 
 vfold f z xxs yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) z xxs 
+
+vfold2 f z xxs yys wws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (yys G.! i)) (wws G.! i) acc) z xxs 
 
 -- plfold f z [] [] = z
 -- plfold f z (x:xs) (y:ys) = Map.insertWith f x y (pfold f z xs ys)
