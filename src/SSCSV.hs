@@ -13,7 +13,8 @@ module SSCSV
         aggrMapM,
         QDatabase,
         convertDB,
-        convertDB'
+        convertDB',
+        convertDB''
     ) where
 
 --      So, for the generic CSV loading we want to do the following:
@@ -42,7 +43,7 @@ import GHC.Exts
 import Quark.Base.Data
 import Quark.Base.Column
 
-import qualified Data.HashMap as Map
+import qualified Data.Map as Map
 import Data.Hashable
 
 -- type CSField = QValue
@@ -164,6 +165,17 @@ convertToCol n db f = V.foldr' (\ x acc -> let el = x V.! n in (f el):acc) [] db
 convertDB db = (V.fromList (convertToCol 14 db id) :: CText, V.fromList (convertToCol 5 db id) :: CText, U.fromList (convertToCol 9 db toDouble) :: CDouble)
 -- converts from QDatabase
 convertDB' db = (V.fromList (convertToCol 14 db qToText) :: CText, V.fromList (convertToCol 5 db qToText) :: CText, U.fromList (convertToCol 9 db qToDouble) :: CDouble)
+convertDB'' db = (V.fromList (convertToCol 14 db qToText) :: CText, 
+    V.fromList (convertToCol 5 db qToText) :: CText, 
+    V.fromList (convertToCol 15 db qToText) :: CText, 
+    U.fromList (convertToCol 9 db qToDouble) :: CDouble)
+
+loadCols name = do
+    (Right f) <- loadToMemory name  HasHeader
+    let pf = processFile encoders f
+    let pfl = convertFileToList pf
+    let (reg, subreg, terr, am) = convertDB'' pf
+    return (reg, subreg, terr, am)
 
 processAggr n m amap line = 
     let x = line V.! n

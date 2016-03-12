@@ -6,7 +6,12 @@
 
 module Quark.Base.Column
     ( 
-        CInt, CDouble, CWord, CBool, CText, GenericColumn, CTable, pfold, vfold, vfold2
+        CInt, CDouble, CWord, CBool, CText, GenericColumn, CTable, vfold, vfold2, vfoldr2, 
+        groupColumns1,
+        groupColumns,
+        groupColumns2,
+        groupColumns3
+
     ) where
 
 import Data.Int
@@ -24,7 +29,7 @@ import Data.Text.Read
 
 import GHC.Exts
 
-import qualified Data.HashMap as Map
+import qualified Data.Map as Map
 import Data.Hashable
 
 -- primitive datatypes columns
@@ -36,54 +41,33 @@ type CBool = U.Vector Bool
 -- boxed column for strings
 type CText = V.Vector Text
 
-class Column a where 
-    checkType :: a -> Text
-
-instance Column CInt where
-    checkType _ = "Int"
-
-instance Column CDouble where
-    checkType _ = "Double"
-
-instance Column CWord where
-    checkType _ = "Word"
-
-instance Column CBool where
-    checkType _ = "Bool"
-
-instance Column CText where
-    checkType _ = "Text"
-
-
 -- is there a better way to do this with RankN? Trying to put all columns regardless of type to a Map
 data GenericColumn = CInt CInt | CDouble CDouble | CWord CWord | CBool CBool | CText CText deriving (Show)
 
 -- Map from column names to columns, representing a table
 type CTable = Map.Map Text GenericColumn 
 
--- grouping by groupCol, aggregating by aggrCol with function func
--- aggregateSimple groupCol aggrCol func
--- aggregateSimpleLine x y f amap = Map.insertWith f x y amap
 
--- aggregateSimle (x:xs) (y:ys) f amap = aggregateSimpleLine x y f amap
+-- group by 1 column, with only 1 aggregation function f to be used on column yys
+groupColumns xxs f yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
+-- group by 2 columns, with only 1 aggregation function
+groupColumns2 (x,y) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (y G.! i)) (ws G.! i) acc) (Map.fromList []) x 
+-- group by 3 columns, with only 1 aggregation function -- etc...
+groupColumns3 (x,y,z) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 
 
-pfold :: (Ord t, Hashable t, U.Unbox t1) =>
-  (t1 -> t1 -> t1) -> Map.Map t t1 -> V.Vector t -> U.Vector t1 -> Map.Map t t1
 
-pfold f z [] [] = z
-pfold f z xxs yys = Map.insertWith f x y (pfold f z xs ys)
-                     where  x = G.head xxs
-                            xs = G.tail xxs
-                            y = G.head yys
-                            ys = G.tail yys
+-- group by (x:xs) - list of columns to groupby, with only 1 aggregation function f to be used on column ws
+groupColumns1 f (x:xs) ws = 
+    G.ifoldl' pline (Map.fromList []) x
+    where 
+        pline acc i l = Map.insertWith f (l: (Prelude.map (G.! i) xs)) (ws G.! i) acc
+        
 
 
 vfold f z xxs yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) z xxs 
 
 vfold2 f z xxs yys wws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (yys G.! i)) (wws G.! i) acc) z xxs 
-
--- plfold f z [] [] = z
--- plfold f z (x:xs) (y:ys) = Map.insertWith f x y (pfold f z xs ys)
+vfoldr2 f z xxs yys wws = G.ifoldr' (\i x acc -> Map.insertWith f (x, (yys G.! i)) (wws G.! i) acc) z xxs 
 
 
 -- encoded text column for faster processing (encodedCol is a column with ints that correspond to position of string in the values vector)
@@ -108,7 +92,19 @@ ctable :: CTable
 ctable = Map.fromList [("# ops", CInt cint), ("$ rev", CDouble cdouble), ("region", CText creg)]
 
 
+{-
+pfold :: (Ord t, Hashable t, U.Unbox t1) =>
+  (t1 -> t1 -> t1) -> Map.Map t t1 -> V.Vector t -> U.Vector t1 -> Map.Map t t1
 
+pfold f z [] [] = z
+pfold f z xxs yys = Map.insertWith f x y (pfold f z xs ys)
+                     where  x = G.head xxs
+                            xs = G.tail xxs
+                            y = G.head yys
+                            ys = G.tail yys
+
+
+-}
 
 
 

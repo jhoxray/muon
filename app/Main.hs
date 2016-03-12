@@ -26,7 +26,7 @@ import Control.DeepSeq
 import Control.Monad.IO.Class -- liftIO !!!
 
 -- import qualified Data.Map as Map
-import qualified Data.HashMap as Map
+import qualified Data.Map as Map
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as G
 
@@ -50,6 +50,8 @@ commandsList =
     , (":runVecR", ("run aggregation via custom vector foldr'", cmdVectorR') )
     , (":runVecL", ("run aggregation via custom vector foldl'", cmdVectorL') )
     , (":runColumn", ("run aggregation via column based storage", cmdColumnRun) )
+    , (":runColumnR", ("run aggregation via column based storage", cmdColumnRunR) )
+    , (":runColumnS", ("run aggregation via column based storage with 1 var", cmdColumnSimple) )
     ]
 
 commands = Map.fromList commandsList
@@ -81,16 +83,47 @@ cmdListCompRun db = do
         t2 <- liftIO getCurrentTime
         outputStrLn $ "Time elapsed in List: " ++ show (diffUTCTime t2 t1)
 
+
+cmdColumnSimple :: QDatabase -> InputT IO ()    
+cmdColumnSimple db = do
+      let (reg, subreg, terr, am) = convertDB'' db
+      outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
+      t1 <- liftIO getCurrentTime
+      let output = groupColumns reg (+) am
+      t2 <- liftIO $ output `deepseq` getCurrentTime
+      outputStrLn $ show output
+      outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)
+      
+      
+
 cmdColumnRun :: QDatabase -> InputT IO ()    
 cmdColumnRun db = do
-      let (reg, subreg, am) = convertDB' db
-      outputStrLn $ show (G.length reg, G.length am, G.length subreg)
+      let (reg, subreg, terr, am) = convertDB'' db
+      outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
       t1 <- liftIO getCurrentTime
       let output = vfold2 (+) (Map.fromList []) reg subreg am
       t2 <- liftIO $ output `deepseq` getCurrentTime
       outputStrLn $ show output
-      -- t2 <- liftIO getCurrentTime
       outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)
+      
+      t3 <- liftIO getCurrentTime
+      let output1 = groupColumns3 (reg, subreg, terr) (+) am
+      t4 <- liftIO $ output1 `deepseq` getCurrentTime
+      outputStrLn $ show output1
+      
+      
+      outputStrLn $ "Time elapsed in Column 2nd time: " ++ show (diffUTCTime t4 t3)
+      
+cmdColumnRunR :: QDatabase -> InputT IO ()    
+cmdColumnRunR db = do
+      let (reg, subreg, am) = convertDB' db
+      outputStrLn $ show (G.length reg, G.length am, G.length subreg)
+      t1 <- liftIO getCurrentTime
+      let output = vfoldr2 (+) (Map.fromList []) reg subreg am
+      t2 <- liftIO $ output `deepseq` getCurrentTime
+      outputStrLn $ show output
+      -- t2 <- liftIO getCurrentTime
+      outputStrLn $ "Time elapsed in Column foldr: " ++ show (diffUTCTime t2 t1)      
 
 cmdCommandsHelp :: t -> InputT IO ()
 cmdCommandsHelp _ = do 

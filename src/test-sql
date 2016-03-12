@@ -1,0 +1,20 @@
+CREATE TABLE veeam_test (
+    buckets     varchar(80), 
+    lifetime    int, 
+    opType      varchar(80),  
+    created     date, 
+    subbucket   varchar(80), 
+    subregion   varchar(80), 
+    opty        varchar(80), 
+    salesteam   varchar(80),     
+    product     varchar(80), 
+    amount      real, 
+    stage       varchar(80), 
+    resID       varchar(80), 
+    parLevel    varchar(80), 
+    reseller    varchar(80), 
+    globalRegion    varchar(80), 
+    region      varchar(80), 
+    closed      date, 
+    dealSize    varchar(80)
+);
