@@ -1,0 +1,15 @@
+Test results on 300K line file in ghci -- proper Column based wins by a huge margin.
+
+*SSCSV G> aggregateSimple pfl -- via generalized list comprehensions
+[[QString "AMER",QDouble 3.04417197e8],[QString "APAC",QDouble 5.9799585e7],[QString "EMEA",QDouble 5.06634006e8]]
+(1.09 secs, 254,387,872 bytes)
+*SSCSV G> vfold (+) (Map.fromList []) reg am -- via COLUMNS and "!" ifold in Vector: 3x speed, almost 2x less memory
+fromList [("AMER",3.04417197e8),("EMEA",5.06634006e8),("APAC",5.9799585e7)]
+(0.35 secs, 148,659,648 bytes)
+*SSCSV G> pfold (+) (Map.fromList []) reg am -- via COLUMNS and naive fold in Vector - faster than list comprehensions, but 2x memory
+fromList [("AMER",3.04417197e8),("EMEA",5.06634006e8),("APAC",5.9799585e7)]
+(1.02 secs, 525,248,512 bytes)
+*SSCSV G> processAggr1' 14 9 pf -- via vector based list comprehensions, so row based - faster than list and naive column, but more memory still
+fromList [(QString "dummy",QDouble 0.0),(QString "AMER",QDouble 3.04417197e8),(QString "EMEA",QDouble 5.06634006e8),(QString "APAC",QDouble 5.9799585e7)]
+(0.85 secs, 276,236,384 bytes)
+

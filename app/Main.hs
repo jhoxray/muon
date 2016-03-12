@@ -10,6 +10,10 @@ import System.IO
 import System.Environment
 import System.Console.Haskeline
 
+import Formatting
+import Formatting.Clock
+import System.Clock
+
 import System.CPUTime
 import Data.Time.Clock
 import System.Info
@@ -19,8 +23,12 @@ import Data.Csv
 
 import Control.Monad.IO.Class -- liftIO !!!
 
-import qualified Data.Map as Map
+-- import qualified Data.Map as Map
+import qualified Data.HashMap as Map
 import qualified Data.Vector as V
+
+import Quark.Base.Data
+import Quark.Base.Column
 
 import SSCSV
 
@@ -51,12 +59,12 @@ cmdLoadFile = do
 
 cmdVectorR' :: QDatabase -> InputT IO ()
 cmdVectorR' db = 
-    let output = V.foldr' (\ x acc -> processAggrM 14 15 5 9 acc x) aggrMapM db
+    let output = V.foldr' (\ x acc -> processAggrM2 14 5 9 acc x) (Map.fromList [] :: Map.Map [QValue] QValue) db
     in outputStrLn $ show output
 
 cmdVectorL' :: QDatabase -> InputT IO ()
 cmdVectorL' db = 
-    let output = V.foldl' (\acc x -> processAggrM 14 15 5 9 acc x) aggrMapM db
+    let output = V.foldl' (\acc x -> processAggrM2 14 5 9 acc x) (Map.fromList [] :: Map.Map [QValue] QValue) db
     in outputStrLn $ show output
 
 
@@ -65,6 +73,12 @@ cmdListCompRun db =
     let pfl = convertFileToList db
         output = aggregateData pfl
     in outputStrLn $ show output
+
+cmdColumnRun :: QDatabase -> InputT IO ()    
+cmdColumnRun db = 
+  let (reg, _, am) = convertDB' db
+      output = vfold (+) (Map.fromList []) reg am
+  in outputStrLn $ show output
 
 cmdCommandsHelp :: t -> InputT IO ()
 cmdCommandsHelp _ = do 
@@ -99,10 +113,12 @@ loop db = do
                                
        Just input       -> let c = Map.lookup input commands
                            in case c of 
-                                (Just cmd) -> do t1 <- liftIO getCurrentTime
+                                (Just cmd) -> do t1 <- liftIO $ getSystemTime
                                                  (snd cmd) db
-                                                 t2 <- liftIO getCurrentTime
-                                                 outputStrLn $ "Time elapsed (ps) " ++ show (diffUTCTime t2 t1)
+                                                 t2 <- liftIO $ getSystemTime
+                                                 -- liftIO $ fprint (timeSpecs % "\n") t1 t2
+                                                 outputStrLn $ "Time elapsed: " ++ show (diffUTCTime t2 t1)
+                                                 -- outputStrLn $ "Time elapsed (ps) " ++ show (t2 - t1)
                                                  loop db
                                 Nothing -> outputStrLn unknownMsg >> loop db
 

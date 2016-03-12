@@ -6,6 +6,7 @@
 
 module Quark.Base.Data
     ( 
+        QValue (QString, QDouble, QInt, QDate, QDateTime, QBool, QMoney, QDateS, QNull, QIllegalValue)
     ) where
 
 import qualified Data.Vector as V
@@ -17,12 +18,16 @@ import Data.Text.Read
 
 import GHC.Exts
 
+import qualified Data.HashMap as Map
+import Data.Hashable
+
 -- primitive datatypes
 data QValue = QString Text
             | QDouble !Double
             | QInt !Int
             | QDate !Day -- # of days from 1858-11-17
             | QDateTime !Int -- # of milliseconds as in Unix time
+            | QDateS (Int, Int, Int) -- stupid placeholder for dd.mm.yyyy format
             | QBool !Bool
             | QMoney !Int -- # representing currency in cents, i.e. 130.23 USD will be 13023 Money - for FAST processing
             | QNull
@@ -61,6 +66,11 @@ instance  Num QValue where
 instance Enum QValue where
     toEnum = QInt 
     fromEnum (QInt i) = i
+
+instance Hashable QValue where
+    hash (QString s) = hash s
+    hashWithSalt k (QString s) = hashWithSalt k s
+
 
 {-
 
