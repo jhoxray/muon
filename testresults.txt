@@ -7,7 +7,15 @@ Ok, by switching to Tuples and Map (from HashMap) we got the time down to 480ms 
 Current theory after running some profiles - GC takes A LOT of time, so we need to optimize csv conversion to the internal 
 column format.
 
+Changing Data.Map to Data.Map.Strict brought execution time down to ~320ms! --> 70% slower than postgres.
 
+With #inline pragmas brought down to 270ms --> 40% slower than postgres.
+
+Changing Map to HashMap from unordered-containers gave us another 20ms back apparently.
+
+
+
+====================================================================================================================
 Test results on 300K line file in ghci -- proper Column based wins by a huge margin.
 
 *SSCSV G> aggregateSimple pfl -- via generalized list comprehensions

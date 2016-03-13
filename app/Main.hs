@@ -26,7 +26,9 @@ import Control.DeepSeq
 import Control.Monad.IO.Class -- liftIO !!!
 
 -- import qualified Data.Map as Map
-import qualified Data.Map as Map
+-- import qualified Data.Map.Strict as Map
+import qualified Data.HashMap.Strict as Map
+
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as G
 
@@ -47,8 +49,8 @@ commandsList =
     , (":commands", ("show all available commands", cmdCommandsHelp) )
     , (":tr", ("test run with sample file", (\x -> liftIO (testRun "src/sample-l.csv") >>= outputStrLn . show)) )
     , (":runList", ("run aggregation via list generalized comprehensions", cmdListCompRun) )
-    , (":runVecR", ("run aggregation via custom vector foldr'", cmdVectorR') )
-    , (":runVecL", ("run aggregation via custom vector foldl'", cmdVectorL') )
+    -- , (":runVecR", ("run aggregation via custom vector foldr'", cmdVectorR') )
+    -- , (":runVecL", ("run aggregation via custom vector foldl'", cmdVectorL') )
     , (":runColumn", ("run aggregation via column based storage", cmdColumnRun) )
     , (":runColumnR", ("run aggregation via column based storage", cmdColumnRunR) )
     , (":runColumnS", ("run aggregation via column based storage with 1 var", cmdColumnSimple) )
@@ -63,6 +65,7 @@ cmdLoadFile = do
     let pf = processFile encoders f
     return pf
 
+{-
 cmdVectorR' :: QDatabase -> InputT IO ()
 cmdVectorR' db = 
     let output = V.foldr' (\ x acc -> processAggrM2 14 5 9 acc x) (Map.fromList [] :: Map.Map [QValue] QValue) db
@@ -72,7 +75,7 @@ cmdVectorL' :: QDatabase -> InputT IO ()
 cmdVectorL' db = 
     let output = V.foldl' (\acc x -> processAggrM2 14 5 9 acc x) (Map.fromList [] :: Map.Map [QValue] QValue) db
     in outputStrLn $ show output
-
+-}
 
 cmdListCompRun :: QDatabase -> InputT IO ()
 cmdListCompRun db = do

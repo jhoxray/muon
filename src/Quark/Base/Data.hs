@@ -18,7 +18,7 @@ import Data.Text.Read
 
 import GHC.Exts
 
-import qualified Data.HashMap as Map
+
 import Data.Hashable
 
 -- primitive datatypes

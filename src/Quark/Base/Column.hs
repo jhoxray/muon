@@ -11,6 +11,7 @@ module Quark.Base.Column
         groupColumns,
         groupColumns2,
         groupColumns3
+        
 
     ) where
 
@@ -29,8 +30,12 @@ import Data.Text.Read
 
 import GHC.Exts
 
-import qualified Data.Map as Map
+-- import qualified Data.Map.Strict as Map
+import qualified Data.HashMap.Strict as Map
 import Data.Hashable
+
+
+type Map = Map.HashMap
 
 -- primitive datatypes columns
 type CInt = U.Vector Int64
@@ -45,18 +50,27 @@ type CText = V.Vector Text
 data GenericColumn = CInt CInt | CDouble CDouble | CWord CWord | CBool CBool | CText CText deriving (Show)
 
 -- Map from column names to columns, representing a table
-type CTable = Map.Map Text GenericColumn 
+type CTable = Map Text GenericColumn 
 
 
 -- group by 1 column, with only 1 aggregation function f to be used on column yys
 groupColumns xxs f yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
+{-# INLINE groupColumns #-}    
 -- group by 2 columns, with only 1 aggregation function
 groupColumns2 (x,y) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (y G.! i)) (ws G.! i) acc) (Map.fromList []) x 
+{-# INLINE groupColumns2 #-}
 -- group by 3 columns, with only 1 aggregation function -- etc...
 groupColumns3 (x,y,z) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 
+{-# INLINE groupColumns3 #-}
+
+
+{- right fold performs worse
+groupColumns3R (x,y,z) f ws = G.ifoldr' (\i x acc -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 
+-}
 
 
 -- group by (x:xs) - list of columns to groupby, with only 1 aggregation function f to be used on column ws
+-- this one is VERY SLOW - because of PRelude??
 groupColumns1 f (x:xs) ws = 
     G.ifoldl' pline (Map.fromList []) x
     where 

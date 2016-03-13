@@ -29,9 +29,9 @@ library
                       , time
                       , haskeline
                       , transformers
-                      , hashmap
                       , hashable
                       , containers
+                      , unordered-containers
   default-language:    Haskell2010
 
 executable muon
@@ -46,10 +46,10 @@ executable muon
                       , containers
                       , cassava
                       , vector
-                      , hashmap
                       , clock
                       , formatting
                       , deepseq
+                      , unordered-containers
   default-language:    Haskell2010
 
 executable server
