@@ -34,6 +34,7 @@ import qualified Data.Vector.Generic as G
 
 import Quark.Base.Data
 import Quark.Base.Column
+import Quark.Base.Aggregation
 
 import SSCSV
 
@@ -106,7 +107,7 @@ cmdColumnRun db = do
       
 
       t1 <- liftIO getCurrentTime
-      let output = groupColumns1 (+) [reg, subreg, terr] am
+      let output = groupColumnsGen (+) [reg, subreg, terr] am
       t2 <- liftIO $ output `deepseq` getCurrentTime
       outputStrLn $ show output
       outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)

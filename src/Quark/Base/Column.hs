@@ -10,13 +10,15 @@
 
 module Quark.Base.Column
     ( 
-        CInt, CDouble, CWord, CBool, CText, GenericColumn, CTable, vfold, vfold2, vfoldr2, 
-        groupColumns1,
-        groupColumns,
-        groupColumns2,
-        groupColumns3
+        CInt, CDouble, CWord, CBool, CText, 
+        GenericColumn (..), 
+        CTable,
+        unpackCInt,
+        unpackCDouble,
+        unpackCWord,
+        unpackCBool,
+        unpackCText
         
-
     ) where
 
 import Data.Int
@@ -59,10 +61,41 @@ type CText = V.Vector Text
 -- is there a better way to do this with RankN? Trying to put all columns regardless of type to a Map
 data GenericColumn = CInt CInt | CDouble CDouble | CWord CWord | CBool CBool | CText CText deriving (Show)
 
+-- encoded text column for faster processing (encodedCol is a column with ints that correspond to position of string in the values vector)
+data ConvertedTextColumn = ConvertedTextColumn { encodedCol :: CInt, values :: CText}
+
+-- Binary instance for Generic Column
+instance Binary GenericColumn where
+    put (CInt v) =      do put (0 :: Word8) >> put v
+    put (CDouble v) =   do put (1 :: Word8) >> put v
+    put (CWord v) =     do put (2 :: Word8) >> put v
+    put (CBool v) =     do put (3 :: Word8) >> put v
+    put (CText v) =     do put (4 :: Word8) >> put v
+
+    get = do t <- get :: Get Word8
+             case t of
+                0 -> get >>= return . CInt 
+                1 -> get >>= return . CDouble
+                2 -> get >>= return . CWord
+                3 -> get >>= return . CBool
+                4 -> get >>= return . CText
+
 
 -- Map from column names to columns, representing a table
 type CTable = Map Text GenericColumn 
 
+
+-- functions extracting Vectors from GenericColumn
+unpackCInt (CInt v) = v
+unpackCInt _ = U.fromList []
+unpackCDouble (CDouble v) = v
+unpackCDouble _ = U.fromList []
+unpackCWord (CWord v) = v
+unpackCWord _ = U.fromList []
+unpackCBool (CBool v) = v
+unpackCBool _ = U.fromList []
+unpackCText (CText v) = v
+unpackCText _ = V.fromList []
 
 {-
 unpackVector :: G.Vector v a => GenericColumn -> v a
@@ -76,41 +109,6 @@ unpackVector _ = U.fromList []
 -}  
 
 
--- group by 1 column, with only 1 aggregation function f to be used on column yys
-groupColumns xxs f yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
-{-# INLINE groupColumns #-}    
--- group by 2 columns, with only 1 aggregation function
-groupColumns2 (x1,x2) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (x2 G.! i)) (ws G.! i) acc) (Map.fromList []) x1
-{-# INLINE groupColumns2 #-}
--- group by 3 columns, with only 1 aggregation function -- etc...
-groupColumns3 (x1,x2,x3) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (x2 G.! i), (x3 G.! i)) (ws G.! i) acc) (Map.fromList []) x1 
-{-# INLINE groupColumns3 #-}
-
-
-{- right fold performs worse
-groupColumns3R (x,y,z) f ws = G.ifoldr' (\i x acc -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 
--}
-
-
--- group by (x:xs) - list of columns to groupby, with only 1 aggregation function f to be used on column ws
--- this one is VERY SLOW - because of PRelude??
-groupColumns1 f (x:xs) ws = 
-    G.ifoldl' pline (Map.fromList []) x
-    where 
-        pline acc i l = Map.insertWith f (l: (Prelude.map (G.! i) xs)) (ws G.! i) acc
-{-# INLINE groupColumns1 #-}     
-
-
-vfold f z xxs yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) z xxs 
-
-vfold2 f z xxs yys wws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (yys G.! i)) (wws G.! i) acc) z xxs 
-vfoldr2 f z xxs yys wws = G.ifoldr' (\i x acc -> Map.insertWith f (x, (yys G.! i)) (wws G.! i) acc) z xxs 
-
-
--- encoded text column for faster processing (encodedCol is a column with ints that correspond to position of string in the values vector)
-data ConvertedTextColumn = ConvertedTextColumn { encodedCol :: CInt, values :: CText}
-
--- aggregate :: CTable -> Text -> 
 
 -- ***************************************************************************************************************************************
 -- TEST DATA
