@@ -1,4 +1,8 @@
-{-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, TypeSynonymInstances, FlexibleInstances, OverloadedLists  #-}
+{-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, 
+                TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric  #-}
+
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
+             TypeFamilies, ScopedTypeVariables #-}
 
 {-
     Column datastore approach
@@ -27,6 +31,7 @@ import Data.Time
 import Data.Time.Calendar
 -- import Text.Read
 import Data.Text.Read
+import Data.Binary
 
 import GHC.Exts
 
@@ -34,6 +39,11 @@ import GHC.Exts
 import qualified Data.HashMap.Strict as Map
 import Data.Hashable
 
+import Data.Vector.Binary -- Binary instances for Vectors!!! 
+-- So, primitive serialization for unboxed types (suitable for not very large files) should be covered automatically
+-- Actually, Text is Binary so works automagically as well! Supah! :)
+
+-- import GHC.Generics (Generic)
 
 type Map = Map.HashMap
 
@@ -49,18 +59,31 @@ type CText = V.Vector Text
 -- is there a better way to do this with RankN? Trying to put all columns regardless of type to a Map
 data GenericColumn = CInt CInt | CDouble CDouble | CWord CWord | CBool CBool | CText CText deriving (Show)
 
+
 -- Map from column names to columns, representing a table
 type CTable = Map Text GenericColumn 
+
+
+{-
+unpackVector :: G.Vector v a => GenericColumn -> v a
+unpackVector (CInt v) = v
+unpackVector (CDouble v) = v
+unpackVector (CWord v) = v
+-- unpackVector (CBool v) = v
+unpackVector _ = U.fromList [] 
+
+-- instance Binary GenericColumn where
+-}  
 
 
 -- group by 1 column, with only 1 aggregation function f to be used on column yys
 groupColumns xxs f yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
 {-# INLINE groupColumns #-}    
 -- group by 2 columns, with only 1 aggregation function
-groupColumns2 (x,y) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (y G.! i)) (ws G.! i) acc) (Map.fromList []) x 
+groupColumns2 (x1,x2) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (x2 G.! i)) (ws G.! i) acc) (Map.fromList []) x1
 {-# INLINE groupColumns2 #-}
 -- group by 3 columns, with only 1 aggregation function -- etc...
-groupColumns3 (x,y,z) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 
+groupColumns3 (x1,x2,x3) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (x2 G.! i), (x3 G.! i)) (ws G.! i) acc) (Map.fromList []) x1 
 {-# INLINE groupColumns3 #-}
 
 
@@ -75,7 +98,7 @@ groupColumns1 f (x:xs) ws =
     G.ifoldl' pline (Map.fromList []) x
     where 
         pline acc i l = Map.insertWith f (l: (Prelude.map (G.! i) xs)) (ws G.! i) acc
-        
+{-# INLINE groupColumns1 #-}     
 
 
 vfold f z xxs yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) z xxs 
@@ -102,8 +125,8 @@ cdouble = U.fromList [13,23,433,23.4,233,4.12,22,1.2,4,-25.2, 1,2,43,234,23,412,
 creg :: CText
 creg = V.fromList ["EMEA", "NA", "EMEA", "RoW", "NA", "RoW", "EMEA", "EMEA", "NA", "RoW", "EMEA", "NA", "RoW", "NA", "RoW", "NA", "RoW", "EMEA", "NA", "EMEA"]
 
-ctable :: CTable
-ctable = Map.fromList [("# ops", CInt cint), ("$ rev", CDouble cdouble), ("region", CText creg)]
+-- ctable :: CTable
+-- ctable = Map.fromList [("# ops", CInt cint), ("$ rev", CDouble cdouble), ("region", CText creg)]
 
 
 {-

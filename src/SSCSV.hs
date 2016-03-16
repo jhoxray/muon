@@ -42,6 +42,7 @@ import GHC.Exts
 
 import Quark.Base.Data
 import Quark.Base.Column
+import Quark.Base.Storage
 
 import qualified Data.Map as Map
 import Data.Hashable

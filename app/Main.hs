@@ -103,8 +103,10 @@ cmdColumnRun :: QDatabase -> InputT IO ()
 cmdColumnRun db = do
       let (reg, subreg, terr, am) = convertDB'' db
       outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
+      
+
       t1 <- liftIO getCurrentTime
-      let output = vfold2 (+) (Map.fromList []) reg subreg am
+      let output = groupColumns1 (+) [reg, subreg, terr] am
       t2 <- liftIO $ output `deepseq` getCurrentTime
       outputStrLn $ show output
       outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)
@@ -113,20 +115,27 @@ cmdColumnRun db = do
       let output1 = groupColumns3 (reg, subreg, terr) (+) am
       t4 <- liftIO $ output1 `deepseq` getCurrentTime
       outputStrLn $ show output1
-      
-      
       outputStrLn $ "Time elapsed in Column 2nd time: " ++ show (diffUTCTime t4 t3)
       
 cmdColumnRunR :: QDatabase -> InputT IO ()    
 cmdColumnRunR db = do
-      let (reg, subreg, am) = convertDB' db
-      outputStrLn $ show (G.length reg, G.length am, G.length subreg)
+      let (reg, subreg, terr, am) = convertDB'' db
+      outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
+      
       t1 <- liftIO getCurrentTime
-      let output = vfoldr2 (+) (Map.fromList []) reg subreg am
+      let output = groupColumns3 (reg, subreg, terr) (+) am -- vfoldr2 (+) (Map.fromList []) reg subreg am
       t2 <- liftIO $ output `deepseq` getCurrentTime
       outputStrLn $ show output
       -- t2 <- liftIO getCurrentTime
-      outputStrLn $ "Time elapsed in Column foldr: " ++ show (diffUTCTime t2 t1)      
+      outputStrLn $ "Time elapsed in Column foldr: " ++ show (diffUTCTime t2 t1)   
+
+      t3 <- liftIO getCurrentTime
+      let output1 = groupColumns3 (reg, subreg, terr) (+) am
+      t4 <- liftIO $ output1 `deepseq` getCurrentTime
+      outputStrLn $ show output1
+      
+      
+      outputStrLn $ "Time elapsed in Column 2nd time: " ++ show (diffUTCTime t4 t3)   
 
 cmdCommandsHelp :: t -> InputT IO ()
 cmdCommandsHelp _ = do 

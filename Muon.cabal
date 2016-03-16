@@ -19,6 +19,7 @@ library
                       , SSCSV 
                       , Quark.Base.Data
                       , Quark.Base.Column
+                      , Quark.Base.Storage
   build-depends:       base >= 4.7 && < 5
                       , websockets
                       , aeson
@@ -32,6 +33,9 @@ library
                       , hashable
                       , containers
                       , unordered-containers
+                      , binary
+                      , primitive
+                      , vector-binary-instances
   default-language:    Haskell2010
 
 executable muon
