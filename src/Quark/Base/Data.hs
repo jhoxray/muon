@@ -6,7 +6,8 @@
 
 module Quark.Base.Data
     ( 
-        QValue (QString, QDouble, QInt, QDate, QDateTime, QBool, QMoney, QDateS, QNull, QIllegalValue)
+        QValue (..),
+        SupportedTypes(..)
     ) where
 
 import qualified Data.Vector as V
@@ -20,6 +21,10 @@ import GHC.Exts
 
 
 import Data.Hashable
+
+
+-- just an enum of supported primitive types in our database
+data SupportedTypes = PInt | PDouble | PWord | PBool | PText deriving (Eq, Ord, Show, Enum)
 
 -- primitive datatypes
 data QValue = QString Text

@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, RankNTypes, TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric  #-}
+{-# LANGUAGE OverloadedStrings, RankNTypes, TypeSynonymInstances, 
+    FlexibleInstances, OverloadedLists, DeriveGeneric, DeriveAnyClass  #-}
 
 {-
     Column datastore approach.
@@ -18,18 +19,82 @@
 module Quark.Base.Storage
     ( 
         saveGenColumn,
-        loadGenColumn
-        
+        loadGenColumn,
+        saveRawColumns,
+        createTableMetadata,
+        saveCTable,
+        loadCTable
+        -- saveColumn,
+        -- loadColumn
     ) where
 
 import Quark.Base.Column
 
-import System.Directory
+import System.Directory -- directory manipulations
 
 import Data.Binary
-import Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector.Generic as G
+
+import qualified Data.HashMap.Strict as Map
+import Data.Hashable
 
 import Data.Text
+
+import GHC.Generics (Generic)
+
+data TableMetadata = TableMetadata { rawColumnsMeta :: [(Text, FilePath)] -- name of the column and full link to the column file
+                     } deriving(Show, Generic)
+
+instance Binary TableMetadata
+
+
+-- pure function that creates TableMetadata from a given Table and table directory path
+createTableMetadata :: CTable           -- CTable
+                    -> FilePath         -- system directory (Now, FLAT - so we put everything in this dir)
+                    -> TableMetadata    -- resulting metadata
+createTableMetadata ct fp = 
+    TableMetadata {rawColumnsMeta = fst $ Map.foldlWithKey' proc ([], 0) ct}
+    where proc (lst, i) k v = ( (k, fp ++ "/column" ++ show i) : lst, i + 1)
+
+
+-- | save a CTable - starting with only RAW columns
+saveCTable :: CTable        -- ^ CTable to save
+           -> FilePath      -- ^ System Directory path
+           -> IO ()     
+saveCTable table sysDir = 
+    do let meta = createTableMetadata table sysDir
+       BL.writeFile (sysDir ++ "/metadata") (encode meta) -- saving metadata first
+       mapM_ proc (rawColumnsMeta meta) -- processing columns
+       where proc (n, fp) = 
+                do  let col = Map.lookup n table
+                    case col of
+                        Just c      -> saveGenColumn fp c
+                        Nothing     -> return ()
+
+
+loadCTable :: FilePath          -- ^ directory with table metadata
+           -> IO CTable         -- ^ resulting CTable with loaded columns (how to handle errors?)
+loadCTable fp = 
+    do metafile <- BL.readFile (fp ++ "/metadata")      -- reading metadata file from a given folder
+       let meta = decode metafile :: TableMetadata      -- decoding metadata file
+       ls <- mapM proc (rawColumnsMeta meta)            -- loading all columns in order
+       return (Map.fromList ls)                         -- returning CTable
+       where proc (n, fpath) = 
+                do gc <- loadGenColumn fpath
+                   return (n, gc)
+
+
+
+-- saving raw colums to sysDir/raw dir (should be passed explicitly) -- internal method
+saveRawColumns :: CTable        -- CTable to save
+               -> FilePath      -- specific directory to save to
+               -> IO ()      
+saveRawColumns table dir = 
+    do mapM_ proc (Map.toList table)
+            where proc (k,v) = 
+                    do let fp = dir ++ "/column_" ++ (unpack k)
+                       saveGenColumn fp v 
 
 -- Generic column serialization
 saveGenColumn :: FilePath -> GenericColumn -> IO ()
@@ -41,6 +106,13 @@ loadGenColumn file = BL.readFile file >>= return . decode
 listFiles = getDirectoryContents
 
 
+{-
+saveColumn :: (G.Vector v a, Binary (v a )) => FilePath -> Column v a -> IO ()
+saveColumn file col = BL.writeFile file (encode col)
+
+loadColumn :: (G.Vector v a, Binary (v a )) => FilePath -> IO (Column v a)
+loadColumn file = BL.readFile file >>= return . decode
+-}
 
 
 

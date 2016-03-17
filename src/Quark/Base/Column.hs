@@ -2,7 +2,7 @@
                 TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric  #-}
 
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
-             TypeFamilies, ScopedTypeVariables #-}
+             TypeFamilies, ScopedTypeVariables, DeriveAnyClass #-}
 
 {-
     Column datastore approach
@@ -12,14 +12,19 @@ module Quark.Base.Column
     ( 
         CInt, CDouble, CWord, CBool, CText, 
         GenericColumn (..), 
+        Column(..),
         CTable,
         unpackCInt,
         unpackCDouble,
         unpackCWord,
         unpackCBool,
-        unpackCText
+        unpackCText,
+
+        ctable
         
     ) where
+
+import Quark.Base.Data
 
 import Data.Int
 import Data.Word
@@ -47,7 +52,7 @@ import Data.Vector.Binary -- Binary instances for Vectors!!!
 
 -- import GHC.Generics (Generic)
 
-type Map = Map.HashMap
+-- type Map = Map.HashMap
 
 -- primitive datatypes columns
 type CInt = U.Vector Int64
@@ -59,10 +64,22 @@ type CBool = U.Vector Bool
 type CText = V.Vector Text
 
 -- is there a better way to do this with RankN? Trying to put all columns regardless of type to a Map
-data GenericColumn = CInt CInt | CDouble CDouble | CWord CWord | CBool CBool | CText CText deriving (Show)
+data GenericColumn = CInt CInt | CDouble CDouble 
+                               | CWord CWord 
+                               | CBool CBool 
+                               | CText CText 
+                               | COptText CInt CText -- optimized text column, CInt stores endodings, CText stores unique values
+                               deriving (Show)
 
 -- encoded text column for faster processing (encodedCol is a column with ints that correspond to position of string in the values vector)
 data ConvertedTextColumn = ConvertedTextColumn { encodedCol :: CInt, values :: CText}
+
+-- data UColumn a = UColumn {rawUVector :: U.Vector a, filePathUCol :: FilePath, nameUCol :: Text}
+data Column = Column {genColumn :: GenericColumn, filePathCol :: FilePath, nameCol :: Text} deriving(Show)
+
+-- Ok, defining Column in a more generic way so that we have raw Vectors, either boxed or unboxed, with some additional info
+-- data Column v a = Column {rawVector :: v a, colName :: Text} deriving (Show, Binary)
+
 
 -- Binary instance for Generic Column
 instance Binary GenericColumn where
@@ -82,8 +99,17 @@ instance Binary GenericColumn where
 
 
 -- Map from column names to columns, representing a table
-type CTable = Map Text GenericColumn 
+type CTable = Map.HashMap Text GenericColumn 
+-- instance Hashable Text 
 
+
+-- checking GenericColumn type
+checkColumnType :: GenericColumn -> SupportedTypes
+checkColumnType (CInt _) = PInt
+checkColumnType (CDouble _) = PDouble
+checkColumnType (CWord _) = PWord
+checkColumnType (CBool _) = PBool
+checkColumnType (CText _) = PText
 
 -- functions extracting Vectors from GenericColumn
 unpackCInt (CInt v) = v
@@ -108,6 +134,36 @@ unpackVector _ = U.fromList []
 -- instance Binary GenericColumn where
 -}  
 
+-- Ok, defining Column in a more generic way so that we have raw Vectors, either boxed or unboxed, with some additional info
+{-
+data Column v a = Column {rawVector :: v a, colName :: Text} deriving(Show) -- , colType :: SupportedTypes 
+
+instance (G.Vector v a, Binary (v a)) => Binary (Column v a) where
+    put Column {rawVector = vec, colName = cn} = do put cn >> put vec
+
+    --get :: (G.Vector v a, Binary (v a)) => Get (Column v a) 
+    get = do nm <- get :: Get Text
+             vec <- get :: Get (v a)
+             return Column {rawVector = vec, colName = nm}
+             
+-}
+-- data UColumn a = UColumn {rawVector :: U.Vector a, colName :: Text, colType :: SupportedTypes } deriving (Show)
+
+-- Binary instance for Column
+{-
+instance (G.Vector v a, Binary (v a)) => Binary (Column v a) where
+    put Column {rawVector = vec, colName = cn, colType = ct} = do put (fromEnum ct) >> put cn >> put vec
+
+    --get :: (G.Vector v a, Binary (v a)) => Get (Column v a) 
+    get = do t <- get :: Get Int
+             nm <- get :: Get Text
+             let pt = toEnum t :: SupportedTypes
+             case pt of 
+                PInt -> do vec <- get :: Get (U.Vector Int64)
+                           return Column {rawVector = vec, colName = nm, colType = pt}
+                PDouble -> do vec <- get :: Get (U.Vector Double)
+                              return Column {rawVector = vec, colName = nm, colType = pt}
+-}  
 
 
 -- ***************************************************************************************************************************************
@@ -123,8 +179,8 @@ cdouble = U.fromList [13,23,433,23.4,233,4.12,22,1.2,4,-25.2, 1,2,43,234,23,412,
 creg :: CText
 creg = V.fromList ["EMEA", "NA", "EMEA", "RoW", "NA", "RoW", "EMEA", "EMEA", "NA", "RoW", "EMEA", "NA", "RoW", "NA", "RoW", "NA", "RoW", "EMEA", "NA", "EMEA"]
 
--- ctable :: CTable
--- ctable = Map.fromList [("# ops", CInt cint), ("$ rev", CDouble cdouble), ("region", CText creg)]
+ctable :: CTable
+ctable = Map.fromList [("# ops", CInt cint), ("$ rev", CDouble cdouble), ("region", CText creg)]
 
 
 {-

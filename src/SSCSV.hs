@@ -45,7 +45,7 @@ import Quark.Base.Column
 import Quark.Base.Storage
 import Quark.Base.Aggregation
 
-import qualified Data.Map as Map
+import qualified Data.HashMap.Strict as Map
 import Data.Hashable
 
 -- type CSField = QValue
