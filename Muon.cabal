@@ -59,6 +59,25 @@ executable muon
                       , hashable
   default-language:    Haskell2010
 
+executable old-muon
+  hs-source-dirs:      app
+  main-is:             Tests.hs
+  ghc-options:         -O -threaded -funfolding-use-threshold=16 -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                      , Muon
+                      , time
+                      , haskeline
+                      , transformers                  
+                      , containers
+                      , cassava
+                      , vector
+                      , clock
+                      , formatting
+                      , deepseq
+                      , unordered-containers
+                      , hashable
+  default-language:    Haskell2010
+
 executable server
   hs-source-dirs:      src/server
   main-is:             server.hs
