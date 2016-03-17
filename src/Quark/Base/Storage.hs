@@ -20,7 +20,6 @@ module Quark.Base.Storage
     ( 
         saveGenColumn,
         loadGenColumn,
-        saveRawColumns,
         createTableMetadata,
         saveCTable,
         loadCTable
@@ -73,6 +72,7 @@ saveCTable table sysDir =
                         Nothing     -> return ()
 
 
+-- | load a CTable previously saved with saveCTable
 loadCTable :: FilePath          -- ^ directory with table metadata
            -> IO CTable         -- ^ resulting CTable with loaded columns (how to handle errors?)
 loadCTable fp = 
@@ -85,16 +85,6 @@ loadCTable fp =
                    return (n, gc)
 
 
-
--- saving raw colums to sysDir/raw dir (should be passed explicitly) -- internal method
-saveRawColumns :: CTable        -- CTable to save
-               -> FilePath      -- specific directory to save to
-               -> IO ()      
-saveRawColumns table dir = 
-    do mapM_ proc (Map.toList table)
-            where proc (k,v) = 
-                    do let fp = dir ++ "/column_" ++ (unpack k)
-                       saveGenColumn fp v 
 
 -- Generic column serialization
 saveGenColumn :: FilePath -> GenericColumn -> IO ()

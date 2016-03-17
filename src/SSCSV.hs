@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TransformListComp #-}
+{-# LANGUAGE OverloadedStrings, TransformListComp, FlexibleContexts #-}
 
 module SSCSV
     ( 
@@ -28,6 +28,7 @@ module SSCSV
 import Data.Csv
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U
+import qualified Data.Vector.Generic as G
 import Data.Text
 import Data.ByteString.Lazy as BL
 import System.IO
@@ -37,8 +38,10 @@ import Text.Read
 import Data.Text.Read
 
 import Data.Time.Clock
+import Data.Time.Calendar
 
 import GHC.Exts
+import Data.Int
 
 import Quark.Base.Data
 import Quark.Base.Column
@@ -53,6 +56,14 @@ import Data.Hashable
 qToDouble :: QValue -> Double
 qToDouble (QDouble x) = x
 qToDouble _ = 0.0
+
+qToInt :: QValue -> Int64
+qToInt (QInt x) = fromIntegral x :: Int64
+qToInt _ = 0
+
+qToDay :: QValue -> Int64 -- converting to Data.Time.Calendar.Day - # of days of Julian calendar or something
+qToDay (QDateS (d,m,y)) = fromIntegral $ toModifiedJulianDay (fromGregorian (fromIntegral y :: Integer) m d) :: Int64
+qToDay _ = 0
 
 qToText :: QValue -> Text
 qToText (QString x) = x
@@ -133,6 +144,12 @@ testRun fname = do
     let output = aggregateData pfl
     return output
 
+testRun1 fname = do 
+    (Right f) <- loadToMemory fname HasHeader
+    let pf = processFile encoders f
+    return pf
+
+
 
 sum' (x:xs) = Prelude.foldr (\acc y -> acc + y) x xs
 
@@ -162,15 +179,50 @@ aggrMapM = Map.fromList [( [QString "dummy",QString "dummy",QString "dummy"],  Q
 -- convert column n to column
 convertToCol n db f = V.foldr' (\ x acc -> let el = x V.! n in (f el):acc) [] db
 
+-- naive and terribly inefficient conversion through vector
+convertToColV n db f = G.foldr' (\ x acc -> let el = x G.! n in (acc `G.snoc` (f el) ) ) V.empty db
+convertToColU n db f = G.foldr' (\ x acc -> let el = x G.! n in (acc `G.snoc` (f el) ) ) U.empty db
+
 -- for testing column algorithms
 -- converts from read file
 convertDB db = (V.fromList (convertToCol 14 db id) :: CText, V.fromList (convertToCol 5 db id) :: CText, U.fromList (convertToCol 9 db toDouble) :: CDouble)
 -- converts from QDatabase
 convertDB' db = (V.fromList (convertToCol 14 db qToText) :: CText, V.fromList (convertToCol 5 db qToText) :: CText, U.fromList (convertToCol 9 db qToDouble) :: CDouble)
+
+convertDB''' db = (convertToColV 14 db qToText :: CText, 
+                  convertToColV 5 db qToText :: CText, 
+                  convertToColV 15 db qToText :: CText, 
+                  convertToColU 9 db qToDouble :: CDouble)
+
+
 convertDB'' db = (V.fromList (convertToCol 14 db qToText) :: CText, 
     V.fromList (convertToCol 5 db qToText) :: CText, 
     V.fromList (convertToCol 15 db qToText) :: CText, 
     U.fromList (convertToCol 9 db qToDouble) :: CDouble)
+
+
+hugeCTable :: QDatabase -> CTable
+hugeCTable db = Map.fromList [
+                ("buckets", CText (V.fromList (convertToCol 0 db qToText) :: CText)),
+                ("lifetime", CInt (U.fromList (convertToCol 1 db qToInt) :: CInt)),
+                ("opty type", CText (V.fromList (convertToCol 2 db qToText) :: CText)),
+                ("created", CInt (U.fromList (convertToCol 3 db qToDay) :: CInt)),
+                ("sub-bucket", CText (V.fromList (convertToCol 4 db qToText) :: CText)),
+                ("subregion", CText (V.fromList (convertToCol 5 db qToText) :: CText)),
+                ("opportunity", CText (V.fromList (convertToCol 6 db qToText) :: CText)),
+                ("salesteam", CText (V.fromList (convertToCol 7 db qToText) :: CText)),
+                ("product", CText (V.fromList (convertToCol 8 db qToText) :: CText)),
+                ("amount", CDouble (U.fromList (convertToCol 9 db qToDouble) :: CDouble)),
+                ("stage", CText (V.fromList (convertToCol 10 db qToText) :: CText)),
+                ("resellerID", CText (V.fromList (convertToCol 11 db qToText) :: CText)),
+                ("partnerLevel", CText (V.fromList (convertToCol 12 db qToText) :: CText)),
+                ("reseller", CText (V.fromList (convertToCol 13 db qToText) :: CText)),
+                ("globalRegion", CText (V.fromList (convertToCol 14 db qToText) :: CText)),
+                ("region", CText (V.fromList (convertToCol 15 db qToText) :: CText)),
+                ("closed", CInt (U.fromList (convertToCol 16 db qToDay) :: CInt)),
+                ("dealSize", CText (V.fromList (convertToCol 17 db qToText) :: CText))
+
+             ]
 
 loadCols name = do
     (Right f) <- loadToMemory name  HasHeader
