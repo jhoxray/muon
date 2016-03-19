@@ -22,6 +22,7 @@ library
                       , Quark.Base.Storage
                       , Quark.Base.Aggregation
                       , Quark.Parsers.Basic
+                      , Quark.Base.Raw
   build-depends:       base >= 4.7 && < 5
                       , websockets
                       , aeson

@@ -19,6 +19,8 @@ import Quark.Base.Column
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Vector.Generic as G
 
+import Data.Hashable
+
 -- groupAggregate (x:[]) = groupColumns x
 -- groupAggregate (x1:x2:[]) = groupColumns2 (x1,x2) 
 
@@ -32,7 +34,7 @@ groupColumns2 (x1,x2) f ws = G.ifoldl' (\ !acc i x -> Map.insertWith f (x, (x2 G
 groupColumns3 (x1,x2,x3) f ws = G.ifoldl' (\ !acc i x -> Map.insertWith f (x, (x2 G.! i), (x3 G.! i)) (ws G.! i) acc) (Map.fromList []) x1 
 {-# INLINE groupColumns3 #-}
 
-
+-- groupColumns' (VH v) f (VH w) = groupColumns v f w
 
 {- right fold performs worse
 groupColumns3R (x,y,z) f ws = G.ifoldr' (\i x acc -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 

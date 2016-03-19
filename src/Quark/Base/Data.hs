@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, GADTs #-}
 
 {-
     Base data definition for further data manipulation

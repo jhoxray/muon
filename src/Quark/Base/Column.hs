@@ -2,7 +2,7 @@
                 TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric  #-}
 
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
-             TypeFamilies, ScopedTypeVariables, DeriveAnyClass, ExistentialQuantification #-}
+             TypeFamilies, ScopedTypeVariables, DeriveAnyClass, ExistentialQuantification, StandaloneDeriving #-}
 
 {-
     Column datastore approach
@@ -21,7 +21,11 @@ module Quark.Base.Column
         unpackCText,
 
         ctable,
-        prettyPrintCT
+        prettyPrintCT,
+
+        VH(..),
+        VHTable,
+        Table(..)
         
     ) where
 
@@ -78,11 +82,56 @@ data GenericColumn = CInt CInt | CDouble CDouble
 -- encoded text column for faster processing (encodedCol is a column with ints that correspond to position of string in the values vector)
 data ConvertedTextColumn = ConvertedTextColumn { encodedCol :: CInt, values :: CText}
 
--- data UColumn a = UColumn {rawUVector :: U.Vector a, filePathUCol :: FilePath, nameUCol :: Text}
-data Column = Column {genColumn :: GenericColumn, filePathCol :: FilePath, nameCol :: Text} deriving(Show)
 
--- Ok, defining Column in a more generic way so that we have raw Vectors, either boxed or unboxed, with some additional info
--- data Column v a = Column {rawVector :: v a, colName :: Text} deriving (Show, Binary)
+-- heterogenous vectors!!! based on existentials
+data VH = forall v a. (Eq a, Hashable a, G.Vector v a, Show (v a), Show a) => VH (v a)
+data VP = forall a. (Show a, U.Unbox a) => VP a
+
+data VG = forall a. (Show a, U.Unbox a, Num a) => VG (U.Vector a)
+
+data VN a = (U.Unbox a, Num a) => VN (U.Vector a)
+
+instance Show VH where
+    show s = case s of 
+                (VH x) -> show x
+
+instance Show VP where
+    show s = case s of 
+                (VP x) -> show x
+
+instance Show VG where
+    show s = case s of 
+                (VG x) -> show x
+
+
+hfoldl1 :: (forall a. (U.Unbox a, Num a) => a -> a -> a) -> VG -> VP
+hfoldl1 f (VG x) = VP $ G.foldl1 f x
+
+
+-- hashmap of VH Vectors -- heterogenous!!!
+type VHTable = Map.HashMap Text VH
+
+-- Column stores some additional type info for VH as well as some storage related etc info
+data Column = Column {hVector :: VH, filePathCol :: FilePath, nameCol :: Text, typeCol :: SupportedTypes} deriving(Show)
+
+-- Table is the proper, real database table
+data Table = Table { tableColumns :: Map.HashMap Text Column,
+                     tableName :: Text
+             }
+
+-- conversion functions for backward compat
+genToVH :: GenericColumn -> VH
+genToVH (CDouble c) = VH c
+genToVH (CInt c) = VH c
+genToVH (CWord v) = VH v
+genToVH (CBool v) = VH v
+genToVH (CText v) = VH v
+
+cTableToVHTable :: CTable -> VHTable
+cTableToVHTable ct = 
+    Map.fromList $ Prelude.map proc (Map.toList ct)
+    where proc (k,v) = (k, genToVH v)
+
 
 
 -- Binary instance for Generic Column
@@ -142,52 +191,6 @@ unpackCBool _ = U.fromList []
 unpackCText (CText v) = v
 unpackCText _ = V.fromList []
 
-applyVec :: (forall v a. G.Vector v a => v a -> GenericColumn) -> GenericColumn -> GenericColumn
-applyVec f (CInt v) = f v
-applyVec f (CDouble v) = f v
-
-
-{-
-unpackVector :: G.Vector v a => GenericColumn -> v a
-unpackVector (CInt v) = v
-unpackVector (CDouble v) = v
-unpackVector (CWord v) = v
--- unpackVector (CBool v) = v
-unpackVector _ = U.fromList [] 
-
--- instance Binary GenericColumn where
--}  
-
--- Ok, defining Column in a more generic way so that we have raw Vectors, either boxed or unboxed, with some additional info
-{-
-data Column v a = Column {rawVector :: v a, colName :: Text} deriving(Show) -- , colType :: SupportedTypes 
-
-instance (G.Vector v a, Binary (v a)) => Binary (Column v a) where
-    put Column {rawVector = vec, colName = cn} = do put cn >> put vec
-
-    --get :: (G.Vector v a, Binary (v a)) => Get (Column v a) 
-    get = do nm <- get :: Get Text
-             vec <- get :: Get (v a)
-             return Column {rawVector = vec, colName = nm}
-             
--}
--- data UColumn a = UColumn {rawVector :: U.Vector a, colName :: Text, colType :: SupportedTypes } deriving (Show)
-
--- Binary instance for Column
-{-
-instance (G.Vector v a, Binary (v a)) => Binary (Column v a) where
-    put Column {rawVector = vec, colName = cn, colType = ct} = do put (fromEnum ct) >> put cn >> put vec
-
-    --get :: (G.Vector v a, Binary (v a)) => Get (Column v a) 
-    get = do t <- get :: Get Int
-             nm <- get :: Get Text
-             let pt = toEnum t :: SupportedTypes
-             case pt of 
-                PInt -> do vec <- get :: Get (U.Vector Int64)
-                           return Column {rawVector = vec, colName = nm, colType = pt}
-                PDouble -> do vec <- get :: Get (U.Vector Double)
-                              return Column {rawVector = vec, colName = nm, colType = pt}
--}  
 
 
 -- ***************************************************************************************************************************************

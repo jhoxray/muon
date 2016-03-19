@@ -41,6 +41,7 @@ import Quark.Base.Data
 import Quark.Base.Column
 import Quark.Base.Aggregation
 import Quark.Base.Storage
+import Quark.Base.Raw
 
 import Quark.Parsers.Basic
 
@@ -54,10 +55,11 @@ unknownMsg = "Unknown input! \n\
 
 -- this is ugly quick hack to test stuff
 data GlobalState = GlobalState {
-                      ctb :: CTable
+                      ctb :: CTable,
+                      cms :: ColumnMemoryStore
                    }
 
-emptyGS = GlobalState {ctb = Map.fromList []}
+emptyGS = GlobalState {ctb = Map.empty, cms = emptyCMS}
 
 commandsList = 
     [ (":ptime",    ("show current ptime", (\x -> liftIO getCPUTime >>= outputStrLn . show )) )
@@ -79,9 +81,11 @@ cmdLoadCTable gs = do
     let (Just reg1, Just subreg1, Just terr1, Just am1) = (Map.lookup "globalRegion" ct, Map.lookup "region" ct, Map.lookup "subregion" ct, Map.lookup "amount" ct)
     let (reg, subreg, terr, am) = (unpackCText reg1, unpackCText subreg1, unpackCText terr1, unpackCDouble am1)
     putStrLn $ show (G.length reg) -- forcing lazy load to execute - there's a better way to do it I'm sure
+    let cm = cTableToCMS ct
     t4 <- getCurrentTime
     putStrLn $ ("Time elapsed: " ++ show (diffUTCTime t4 t3)) 
-    return GlobalState {ctb = ct}
+    putStrLn $ ("Fields in the db: " ++ show (getColNames cm))
+    return GlobalState {ctb = ct, cms = cm}
 
 
 cmdColumnRunMem :: GlobalState -> InputT IO ()    
