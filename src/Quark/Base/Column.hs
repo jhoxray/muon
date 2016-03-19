@@ -2,7 +2,7 @@
                 TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric  #-}
 
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
-             TypeFamilies, ScopedTypeVariables, DeriveAnyClass #-}
+             TypeFamilies, ScopedTypeVariables, DeriveAnyClass, ExistentialQuantification #-}
 
 {-
     Column datastore approach
@@ -20,7 +20,8 @@ module Quark.Base.Column
         unpackCBool,
         unpackCText,
 
-        ctable
+        ctable,
+        prettyPrintCT
         
     ) where
 
@@ -45,6 +46,9 @@ import GHC.Exts
 -- import qualified Data.Map.Strict as Map
 import qualified Data.HashMap.Strict as Map
 import Data.Hashable
+
+import System.IO (putStrLn, putStr)
+import Control.Monad (mapM_)
 
 import Data.Vector.Binary -- Binary instances for Vectors!!! 
 -- So, primitive serialization for unboxed types (suitable for not very large files) should be covered automatically
@@ -103,6 +107,21 @@ type CTable = Map.HashMap Text GenericColumn
 -- instance Hashable Text 
 
 
+prettyPrintCT :: CTable -> IO ()
+prettyPrintCT ct = do
+    let ls = Map.toList ct
+    mapM_ prt ls
+    putStrLn ""
+    let gc = snd . Prelude.head $ ls
+    case gc of
+        CDouble v -> G.imapM_ proc v
+        CInt v -> G.imapM_ proc v
+        CText v -> G.imapM_ proc v
+    where prt (k,v) = putStr (unpack k ++ "\t\t\t")
+          proc i x  = do 
+                putStr (show x ++ "\t\t\t")
+
+
 -- checking GenericColumn type
 checkColumnType :: GenericColumn -> SupportedTypes
 checkColumnType (CInt _) = PInt
@@ -122,6 +141,11 @@ unpackCBool (CBool v) = v
 unpackCBool _ = U.fromList []
 unpackCText (CText v) = v
 unpackCText _ = V.fromList []
+
+applyVec :: (forall v a. G.Vector v a => v a -> GenericColumn) -> GenericColumn -> GenericColumn
+applyVec f (CInt v) = f v
+applyVec f (CDouble v) = f v
+
 
 {-
 unpackVector :: G.Vector v a => GenericColumn -> v a

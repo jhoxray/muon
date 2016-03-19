@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, 
-                TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric  #-}
+                TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric, BangPatterns  #-}
 
 {-
     Aggregation functions
@@ -19,16 +19,19 @@ import Quark.Base.Column
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Vector.Generic as G
 
+-- groupAggregate (x:[]) = groupColumns x
+-- groupAggregate (x1:x2:[]) = groupColumns2 (x1,x2) 
 
 -- group by 1 column, with only 1 aggregation function f to be used on column yys
-groupColumns xxs f yys = G.ifoldl' (\acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
+groupColumns xxs f yys = G.ifoldl' (\ !acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
 {-# INLINE groupColumns #-}    
 -- group by 2 columns, with only 1 aggregation function
-groupColumns2 (x1,x2) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (x2 G.! i)) (ws G.! i) acc) (Map.fromList []) x1
+groupColumns2 (x1,x2) f ws = G.ifoldl' (\ !acc i x -> Map.insertWith f (x, (x2 G.! i)) (ws G.! i) acc) (Map.fromList []) x1
 {-# INLINE groupColumns2 #-}
 -- group by 3 columns, with only 1 aggregation function -- etc...
-groupColumns3 (x1,x2,x3) f ws = G.ifoldl' (\acc i x -> Map.insertWith f (x, (x2 G.! i), (x3 G.! i)) (ws G.! i) acc) (Map.fromList []) x1 
+groupColumns3 (x1,x2,x3) f ws = G.ifoldl' (\ !acc i x -> Map.insertWith f (x, (x2 G.! i), (x3 G.! i)) (ws G.! i) acc) (Map.fromList []) x1 
 {-# INLINE groupColumns3 #-}
+
 
 
 {- right fold performs worse

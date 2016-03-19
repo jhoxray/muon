@@ -21,9 +21,13 @@ import Data.Time.Clock
 import System.Info
 import System.Environment
 
+import Control.Monad.Trans.Class
+
 import Control.DeepSeq
 
 import Control.Monad.IO.Class -- liftIO !!!
+
+import qualified Data.Text as T
 
 -- import qualified Data.Map as Map
 -- import qualified Data.Map.Strict as Map
@@ -37,6 +41,8 @@ import Quark.Base.Data
 import Quark.Base.Column
 import Quark.Base.Aggregation
 import Quark.Base.Storage
+
+import Quark.Parsers.Basic
 
 import SSCSV
 
@@ -57,6 +63,7 @@ commandsList =
     [ (":ptime",    ("show current ptime", (\x -> liftIO getCPUTime >>= outputStrLn . show )) )
     , (":time",     ("show current time",  (\x -> liftIO getCurrentTime >>= outputStrLn . show)) )
     , (":env",      ("show Environment", cmdEnv) )
+    , (":sysinfo",      ("show Environment", cmdSysinfo) )
     , (":commands", ("show all available commands", cmdCommandsHelp) )
     , (":runColumn", ("run aggregation via column based storage in-memory (run :load first!!!)", cmdColumnRunMem) )
     ]
@@ -71,9 +78,9 @@ cmdLoadCTable gs = do
     ct <- loadCTable "/Users/aantich/temp/db2"
     let (Just reg1, Just subreg1, Just terr1, Just am1) = (Map.lookup "globalRegion" ct, Map.lookup "region" ct, Map.lookup "subregion" ct, Map.lookup "amount" ct)
     let (reg, subreg, terr, am) = (unpackCText reg1, unpackCText subreg1, unpackCText terr1, unpackCDouble am1)
-    print $ show (G.length reg) -- forcing lazy load to execute - there's a better way to do it I'm sure
+    putStrLn $ show (G.length reg) -- forcing lazy load to execute - there's a better way to do it I'm sure
     t4 <- getCurrentTime
-    print $ "Time elapsed: " ++ show (diffUTCTime t4 t3)
+    putStrLn $ ("Time elapsed: " ++ show (diffUTCTime t4 t3)) 
     return GlobalState {ctb = ct}
 
 
@@ -116,22 +123,26 @@ cmdSysinfo _ = do
 loop :: GlobalState -> InputT IO ()
 loop gs = do
    minput <- getInputLine prompt
-   case minput of
-       Nothing -> return ()
-       Just ":quit"     -> return ()
-       Just ":help"     -> outputStrLn helpMsg >> loop gs
-       Just ":load"     -> liftIO (cmdLoadCTable gs) >>= loop
-                               
-       Just input       -> let c = Map.lookup input commands
-                           in case c of 
-                                (Just cmd) -> do t1 <- liftIO getCurrentTime
-                                                 (snd cmd) gs
-                                                 t2 <- liftIO getCurrentTime
-                                                 -- liftIO $ fprint (timeSpecs % "\n") t1 t2
-                                                 outputStrLn $ "Time elapsed: " ++ show (diffUTCTime t2 t1)
-                                                 -- outputStrLn $ "Time elapsed (ps) " ++ show (t2 - t1)
-                                                 loop gs
-                                Nothing -> outputStrLn unknownMsg >> loop gs
+   let (Just tmp1) = minput
+   case (parseAggregation $ T.pack tmp1) of
+        Right x   -> outputStrLn (show x) >> loop gs
+        Left _    -> case minput of
+                           Nothing -> return ()
+                           Just ":quit"     -> return ()
+                           Just ":help"     -> outputStrLn helpMsg >> loop gs
+                           Just ":load"     -> liftIO (cmdLoadCTable gs) >>= loop
+                                                   
+                           Just input       -> let c = Map.lookup input commands
+                                               in case c of 
+                                                    (Just cmd) -> do t1 <- liftIO getCurrentTime
+                                                                     (snd cmd) gs
+                                                                     t2 <- liftIO getCurrentTime
+                                                                     -- liftIO $ fprint (timeSpecs % "\n") t1 t2
+                                                                     outputStrLn $ "Time elapsed: " ++ show (diffUTCTime t2 t1)
+                                                                     -- outputStrLn $ "Time elapsed (ps) " ++ show (t2 - t1)
+                                                                     loop gs
+                                                    Nothing -> outputStrLn unknownMsg >> loop gs
+   
 
                         
 main :: IO ()
