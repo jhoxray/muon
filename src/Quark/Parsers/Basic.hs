@@ -12,7 +12,8 @@ module Quark.Parsers.Basic
         Vars(..),
         parseAggregation,
         colToNames,
-        funcToFunction
+        funcToFunction,
+        funcToFunctions
         
     ) where
 
@@ -40,10 +41,13 @@ colToName :: Vars -> Text
 colToName (Col t) = t
 colToName _ = ""
 
-colToNames vs = Prelude.map colToName vs
+colToNames :: OpTerm -> [Text]
+colToNames (GroupBy vs) = Prelude.map colToName vs
 
 -- funcToFunction (Appl Id t) = (id, t)
 funcToFunction (Appl Sum t) = ( (+), t)
+
+funcToFunctions (Aggr lst) = Prelude.map funcToFunction lst
 
 quotedString :: Parser Vars
 quotedString = Col <$> quotedStringText

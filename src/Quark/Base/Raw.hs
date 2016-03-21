@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, RankNTypes, GADTs, OverloadedLists  #-}
+{-# LANGUAGE OverloadedStrings, RankNTypes, GADTs, OverloadedLists, 
+MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances, FlexibleContexts, StandaloneDeriving, DeriveDataTypeable  #-}
 
 
 
@@ -9,11 +10,18 @@
 module Quark.Base.Raw
     ( 
         ColumnMemoryStore(..),
+        VPair(..),
+        NumericVector(..),
+        GenericVector(..),
         emptyCMS,
         
         getColNames,
+        getColNamesTypes,
         checkColType,
         checkColType',
+
+        extractVec,
+        
         
         getIntColumn,
         getDoubleColumn,
@@ -43,6 +51,10 @@ import Data.Hashable
 
 import Control.Monad (mapM_)
 
+import Data.Typeable
+import Data.Data
+
+
 import Data.Vector.Binary -- Binary instances for Vectors!!! 
 -- So, primitive serialization for unboxed types (suitable for not very large files) should be covered automatically
 -- Actually, Text is Binary so works automagically as well! Supah! :)
@@ -53,6 +65,34 @@ import Quark.Base.Column
 type UColMap a = Map.HashMap Text (U.Vector a)
 type BColMap a = Map.HashMap Text (V.Vector a)
 
+data VPair where
+    MkHM :: (Hashable k, Show k, Show v) => Map.HashMap k v -> VPair
+    MkVec ::  (Eq a1, Show a1, Hashable a1, Vector v1 a1, Show (v1 a1) ) => v1 a1 -> VPair
+    MkPair2 :: (Vector v1 a1, Vector v2 a2) => v1 a1 -> v2 a2 -> VPair
+    MkPair3 :: (Vector v1 a1, Vector v2 a2, Vector v3 a3) => v1 a1 -> v2 a2 -> v3 a3 -> VPair
+    MkPair4 :: (Vector v1 a1, Vector v2 a2, Vector v3 a3, Vector v4 a4) => v1 a1 -> v2 a2 -> v3 a3 -> v4 a4 -> VPair
+
+data NumericVector where
+    NumericVector :: (Num a, Show a, U.Unbox a, Eq a, Hashable a) => U.Vector a -> NumericVector
+
+data GenericVector where
+    GenericVector :: (Show a, Eq a, Hashable a, Vector v a, Show (v a)) => v a -> GenericVector
+
+numToGen (NumericVector n) = GenericVector n
+
+-- genToNum (GenericVector  (U.Vector a) ) = NumericVector (U.Vector a)
+
+instance Show GenericVector where
+    show (GenericVector v) = show v
+
+
+instance Show NumericVector where
+    show (NumericVector v) = show v
+
+instance Show VPair where
+    show (MkVec v) = show v
+    show (MkHM hm) = show hm
+
 -- Ok, trying different approach -- storing all columns in maps by type 
 data ColumnMemoryStore = ColumnMemoryStore {
         intCols :: UColMap Int64,
@@ -62,10 +102,67 @@ data ColumnMemoryStore = ColumnMemoryStore {
     
     } deriving (Show)
 
+data HColumn = HColumn {
+        intCol :: U.Vector Int64,
+        doubleCol :: U.Vector Double,
+        accessor ::  HColumn -> (forall v a. (Vector v a, Num a) => v a)
+    }   
+
+data SomeVec = forall v a . (Typeable v, Typeable a, Show (v a)) => SomeVec (v a) deriving (Typeable)
+-- deriving instance Data SomeVec
+deriving instance Show SomeVec 
+
+{-
+data ColumnMemoryStoreRaw = forall a. (Num a, Show a, U.Unbox a) => CMSR (Map.HashMap Text (U.Vector a) )
+
+cmsrInsert :: Text -> (forall a. (Num a, Show a, U.Unbox a) => U.Vector a )-> ColumnMemoryStoreRaw -> ColumnMemoryStoreRaw
+cmsrInsert k v (CMSR m) = CMSR $ Map.insert k v m
+
+cmsrLookup :: Text -> ColumnMemoryStoreRaw -> Maybe NumericVector 
+cmsrLookup k (CMSR m) = case Map.lookup k m of
+                            Just x -> Just $ NumericVector x
+                            Nothing -> Nothing
+-}
+
+-- nGroupCols :: NumericVector -> (forall a. Num a => a -> a -> a) -> NumericVector
+
+{-
+extractVec' :: forall v a. Vector v a => Text -> ColumnMemoryStore -> v a
+extractVec' nm cms = 
+    let t = checkColType' nm cms
+    in case t of
+            PInt -> getUColumn nm (intCols cms)
+-}
+
+-- Ok, this class is what we need to extract any kind of Vectors from our storage by telling the type of what we need
+class Vector v a => ExV t v a where 
+    extractVec :: Text -> t -> v a
+
+instance ExV ColumnMemoryStore U.Vector Int64 where
+    extractVec = getIntColumn
+
+instance ExV ColumnMemoryStore U.Vector Double where
+    extractVec = getDoubleColumn
+
+instance ExV ColumnMemoryStore V.Vector Text where
+    extractVec = getTextColumn
+
+instance ExV (UColMap Int64) U.Vector Int64 where
+    extractVec  = getUColumn 
+
+instance ExV (UColMap Double) U.Vector Double where
+    extractVec  = getUColumn 
+
+instance ExV (BColMap Text) V.Vector Text where
+    extractVec  = getBColumn
+
 emptyCMS = ColumnMemoryStore {intCols = Map.empty, doubleCols = Map.empty, textCols = Map.empty, typeSchema = Map.empty}
 
 getColNames :: ColumnMemoryStore -> [Text]
 getColNames cms = Map.keys (typeSchema cms)
+
+getColNamesTypes :: ColumnMemoryStore -> [(Text, SupportedTypes)]
+getColNamesTypes cms = Map.toList (typeSchema cms)
 
 -- checks type of the column and returns Maybe SupportedType - useful to check if the column is in the store
 checkColType :: Text -> ColumnMemoryStore -> Maybe SupportedTypes

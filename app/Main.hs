@@ -35,7 +35,12 @@ import qualified Data.HashMap.Strict as Map
 import Data.Hashable
 
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Generic as G
+
+import qualified Data.HashTable.IO as H
+
+import Data.Int
 
 import Quark.Base.Data
 import Quark.Base.Column
@@ -123,13 +128,62 @@ cmdSysinfo _ = do
     outputStrLn compilerName
     outputStrLn $ show compilerVersion
 
+cmdRunAggregation (fs, sn) gs = 
+  do outputStrLn $ show fs
+     outputStrLn $ show sn
+     let gb = colToNames fs
+     let ag = funcToFunctions sn
+     outputStrLn $ show gb
+     let aggCol = extractVec "amount" (cms gs) :: U.Vector Double
+     -- outputStrLn $ show aggCol
+     case length gb of
+        1 -> do let colname = gb !! 0
+                let t1 = checkColType' colname (cms gs)
+                case t1 of
+                    PText -> let col = extractVec colname (cms gs) :: V.Vector T.Text
+                             in do timedAggr1 col (+) id aggCol -- summing
+                                   timedAggr1 col (+) (const (1::Int)) aggCol -- counting
+                                   timedAggr1 col (++) (:[]) aggCol -- building a list
+                    PInt -> let col = extractVec colname (cms gs) :: U.Vector Int64
+                            in timedAggr1 col (+) id aggCol
+                -- let c1 = extractVec colname (cms gs)
+                -- outputStrLn $ (show colname) ++ ": " ++ (show t1)
+     -- outputStrLn $ show ag
+
+timedAggr1 col f g acol = 
+  do 
+     t3 <- liftIO getCurrentTime
+     let result = groupColumnsG1A1 col f g acol
+     t4 <- liftIO $ result `deepseq` getCurrentTime
+     outputStrLn $ "Returned lines: " ++ show (Map.size result)
+     outputStrLn $ "Time elapsed in generic function: " ++ show (diffUTCTime t4 t3)
+     
+timedAggr0 col f acol = 
+  do 
+     t3 <- liftIO getCurrentTime
+     let result = groupColumns col f acol
+     t4 <- liftIO $ result `deepseq` getCurrentTime
+     outputStrLn $ show result
+     outputStrLn $ "Time elapsed: " ++ show (diffUTCTime t4 t3)
+     
+
+     t1 <- liftIO getCurrentTime
+     res <- liftIO $ groupColumnsH col f acol
+     t2 <- liftIO $ getCurrentTime
+     r <- liftIO (H.toList res)
+     outputStrLn $ show r
+     outputStrLn $ "Time elapsed 2nd time: " ++ show (diffUTCTime t2 t1)
+
+
+     
+
 -- main loop, processing commands
 loop :: GlobalState -> InputT IO ()
 loop gs = do
    minput <- getInputLine prompt
    let (Just tmp1) = minput
    case (parseAggregation $ T.pack tmp1) of
-        Right x   -> outputStrLn (show x) >> loop gs
+        Right x   -> cmdRunAggregation x gs >> loop gs
         Left _    -> case minput of
                            Nothing -> return ()
                            Just ":quit"     -> return ()

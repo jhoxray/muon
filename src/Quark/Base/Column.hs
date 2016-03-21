@@ -23,6 +23,10 @@ module Quark.Base.Column
         ctable,
         prettyPrintCT,
 
+        cint,
+        cdouble,
+        creg,
+
         VH(..),
         VHTable,
         Table(..)
@@ -197,13 +201,13 @@ unpackCText _ = V.fromList []
 -- TEST DATA
 -- ***************************************************************************************************************************************
 
-cint :: CInt
+cint :: U.Vector Int64
 cint = U.fromList [1,2,43,234,23,412,24,12,4,252,1,2,43,234,23,412,24,12,4,252]
 
-cdouble :: CDouble
+cdouble :: U.Vector Double
 cdouble = U.fromList [13,23,433,23.4,233,4.12,22,1.2,4,-25.2, 1,2,43,234,23,412,24,12,4,252]
 
-creg :: CText
+creg :: V.Vector Text
 creg = V.fromList ["EMEA", "NA", "EMEA", "RoW", "NA", "RoW", "EMEA", "EMEA", "NA", "RoW", "EMEA", "NA", "RoW", "NA", "RoW", "NA", "RoW", "EMEA", "NA", "EMEA"]
 
 ctable :: CTable

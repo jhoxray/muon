@@ -5,4 +5,6 @@ extra-deps:
 - ghc-simple-0.3
 - shellmate-0.2.3
 - haste-compiler-0.5.4
+- tuple-0.3.0.2
+- OneTuple-0.2.1
 resolver: lts-5.8
