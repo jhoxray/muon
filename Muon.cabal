@@ -48,7 +48,7 @@ library
 executable muon
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -O2 -threaded -funfolding-use-threshold=16 -rtsopts -with-rtsopts=-N
+  ghc-options:         -O -threaded -funfolding-use-threshold=16 -rtsopts -with-rtsopts=-N
   build-depends:       base
                       , Muon   
                       , time

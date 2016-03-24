@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, GADTs #-}
+{-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, GADTs, DeriveAnyClass #-}
 
 {-
     Base data definition for further data manipulation
@@ -28,13 +28,13 @@ data SupportedTypes = PInt | PDouble | PWord | PBool | PText deriving (Eq, Ord, 
 
 -- primitive datatypes
 data QValue = QString Text
-            | QDouble !Double
-            | QInt !Int
-            | QDate !Day -- # of days from 1858-11-17
-            | QDateTime !Int -- # of milliseconds as in Unix time
-            | QDateS (Int, Int, Int) -- stupid placeholder for dd.mm.yyyy format
-            | QBool !Bool
-            | QMoney !Int -- # representing currency in cents, i.e. 130.23 USD will be 13023 Money - for FAST processing
+            | QDouble {-# UNPACK #-}!Double
+            | QInt {-# UNPACK #-} !Int
+            -- | QDate {-# UNPACK #-} !Day -- # of days from 1858-11-17
+            | QDateTime {-# UNPACK #-}!Int -- # of milliseconds as in Unix time
+            | QDateS {-# UNPACK #-} !(Int, Int, Int) -- stupid placeholder for dd.mm.yyyy format
+            | QBool {-# UNPACK #-} !Bool
+            | QMoney {-# UNPACK #-}!Int -- # representing currency in cents, i.e. 130.23 USD will be 13023 Money - for FAST processing
             | QNull
             | QIllegalValue
               deriving (Eq, Ord, Show)
@@ -44,6 +44,7 @@ type KVP = V.Vector (Text, QValue)
 -- ok, using RankNTypes here - need to be able to inject binary operation that acts on ANY Num types.
 -- That is what the (forall a. Num a =>  a -> a -> a) signature defines - polymorfic function good for ALL Num types.
 -- Otherwise it wouldn't work on both Ints and Doubles
+{-# INLINE injectBinOp #-}
 injectBinOp :: (forall a. Num a =>  a -> a -> a) -> QValue -> QValue -> QValue
 injectBinOp binOp (QInt x) (QInt y) = QInt (binOp x y)
 injectBinOp binOp (QDouble x) (QDouble y) = QDouble (binOp x y)
@@ -54,6 +55,7 @@ injectBinOp binOp (QMoney x) (QMoney y) = QMoney (binOp x y)
 injectBinOp binOp (QDateTime x) (QDateTime y) = QDateTime (binOp x y)
 injectBinOp binOp _ _ = QIllegalValue
 
+{-# INLINE injectOp #-}
 injectOp :: (forall a. Num a => a -> a ) -> QValue -> QValue
 injectOp op (QInt x) = QInt (op x)
 injectOp op (QDouble x) = QDouble (op x)

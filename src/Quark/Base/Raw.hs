@@ -53,6 +53,7 @@ import Control.Monad (mapM_)
 
 import Data.Typeable
 import Data.Data
+import Data.Dynamic
 
 
 import Data.Vector.Binary -- Binary instances for Vectors!!! 
@@ -73,21 +74,27 @@ data VPair where
     MkPair4 :: (Vector v1 a1, Vector v2 a2, Vector v3 a3, Vector v4 a4) => v1 a1 -> v2 a2 -> v3 a3 -> v4 a4 -> VPair
 
 data NumericVector where
-    NumericVector :: (Num a, Show a, U.Unbox a, Eq a, Hashable a) => U.Vector a -> NumericVector
+    NumericVector :: (Num a, Show a, U.Unbox a) => U.Vector a -> NumericVector
 
 data GenericVector where
     GenericVector :: (Show a, Eq a, Hashable a, Vector v a, Show (v a)) => v a -> GenericVector
 
-numToGen (NumericVector n) = GenericVector n
+-- numToGen (NumericVector n) = GenericVector n
 
 -- genToNum (GenericVector  (U.Vector a) ) = NumericVector (U.Vector a)
 
-instance Show GenericVector where
-    show (GenericVector v) = show v
+
+data Type a where
+  TBool :: Type Bool
+  TInt  :: Type Int
+
+def :: Type a -> a
+def TBool = False
+def TInt  = 0
 
 
-instance Show NumericVector where
-    show (NumericVector v) = show v
+deriving instance Show GenericVector 
+deriving instance Show NumericVector
 
 instance Show VPair where
     show (MkVec v) = show v
@@ -112,6 +119,13 @@ data SomeVec = forall v a . (Typeable v, Typeable a, Show (v a)) => SomeVec (v a
 -- deriving instance Data SomeVec
 deriving instance Show SomeVec 
 
+data HVec = HVec {
+        dynVec :: Dynamic,
+        castVec :: Dynamic -> (forall v a. (Vector v a, Num a, Typeable v, Typeable a, Show (v a)) => Maybe (v a))
+    }
+
+
+
 {-
 data ColumnMemoryStoreRaw = forall a. (Num a, Show a, U.Unbox a) => CMSR (Map.HashMap Text (U.Vector a) )
 
@@ -135,7 +149,7 @@ extractVec' nm cms =
 -}
 
 -- Ok, this class is what we need to extract any kind of Vectors from our storage by telling the type of what we need
-class Vector v a => ExV t v a where 
+class (Vector v a, Eq a, Hashable a) => ExV t v a where 
     extractVec :: Text -> t -> v a
 
 instance ExV ColumnMemoryStore U.Vector Int64 where

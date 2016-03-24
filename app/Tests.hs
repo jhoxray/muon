@@ -95,7 +95,7 @@ cmdColumnRunMem gs = do
       outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
 
       t3 <- liftIO getCurrentTime
-      let output1 = groupColumns3 (reg, subreg, terr) (+) am
+      let output1 = groupColumnsG3A1 (reg, subreg, terr) (+) id am
       t4 <- liftIO $ output1 `deepseq` getCurrentTime
       outputStrLn $ show output1
       outputStrLn $ "Time elapsed in Column 2nd time: " ++ show (diffUTCTime t4 t3)
@@ -131,7 +131,7 @@ cmdColumnSimple gs = do
       let (reg, subreg, terr, am) = convertDB'' db
       outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
       t1 <- liftIO getCurrentTime
-      let output = groupColumns reg (+) am
+      let output = groupColumnsG1A1 reg (+) id am
       t2 <- liftIO $ output `deepseq` getCurrentTime
       outputStrLn $ show output
       outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)
@@ -152,7 +152,7 @@ cmdColumnRun gs = do
       outputStrLn $ "Time elapsed in Column: " ++ show (diffUTCTime t2 t1)
       
       t3 <- liftIO getCurrentTime
-      let output1 = groupColumns3 (reg, subreg, terr) (+) am
+      let output1 = groupColumnsG3A1 (reg, subreg, terr) (+) id am
       t4 <- liftIO $ output1 `deepseq` getCurrentTime
       outputStrLn $ show output1
       outputStrLn $ "Time elapsed in Column 2nd time: " ++ show (diffUTCTime t4 t3)
@@ -164,14 +164,14 @@ cmdColumnRunR gs = do
       outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
       
       t1 <- liftIO getCurrentTime
-      let output = groupColumns3 (reg, subreg, terr) (+) am -- vfoldr2 (+) (Map.fromList []) reg subreg am
+      let output = groupColumnsG3A1 (reg, subreg, terr) (+) id am -- vfoldr2 (+) (Map.fromList []) reg subreg am
       t2 <- liftIO $ output `deepseq` getCurrentTime
       outputStrLn $ show output
       -- t2 <- liftIO getCurrentTime
       outputStrLn $ "Time elapsed in Column foldr: " ++ show (diffUTCTime t2 t1)   
 
       t3 <- liftIO getCurrentTime
-      let output1 = groupColumns3 (reg, subreg, terr) (+) am
+      let output1 = groupColumnsG3A1 (reg, subreg, terr) (+) id am
       t4 <- liftIO $ output1 `deepseq` getCurrentTime
       outputStrLn $ show output1
       

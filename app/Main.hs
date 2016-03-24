@@ -101,7 +101,7 @@ cmdColumnRunMem gs = do
       -- outputStrLn $ show (G.length reg, G.length am, G.length subreg, G.length terr)
 
       t3 <- liftIO getCurrentTime
-      let output1 = groupColumns3 (reg, subreg, terr) (+) am
+      let output1 = groupColumnsG3A1 (reg, subreg, terr) (+) id am
       t4 <- liftIO $ output1 `deepseq` getCurrentTime
       outputStrLn $ show output1
       outputStrLn $ "Time elapsed in Column 2nd time: " ++ show (diffUTCTime t4 t3)
@@ -161,7 +161,7 @@ timedAggr1 col f g acol =
 timedAggr0 col f acol = 
   do 
      t3 <- liftIO getCurrentTime
-     let result = groupColumns col f acol
+     let result = groupColumns1 col f id acol
      t4 <- liftIO $ result `deepseq` getCurrentTime
      outputStrLn $ show result
      outputStrLn $ "Time elapsed: " ++ show (diffUTCTime t4 t3)

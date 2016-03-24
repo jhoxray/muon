@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TransformListComp, RankNTypes, 
-                TypeSynonymInstances, FlexibleInstances, OverloadedLists, DeriveGeneric, BangPatterns, FlexibleContexts  #-}
+                TypeSynonymInstances, FlexibleInstances, OverloadedLists, 
+                DeriveGeneric, BangPatterns, FlexibleContexts, TypeFamilies, 
+                GADTs, MultiParamTypeClasses, InstanceSigs  #-}
 
 {-
     Aggregation functions
@@ -8,28 +10,40 @@
 module Quark.Base.Aggregation
     ( 
         groupColumnsGen,
-        groupColumns,
+        groupColumns1,
         groupColumns2,
         groupColumns3,
         groupColumnsST,
         groupColumnsH,
         groupColumnsFList,
         groupColumnsG1A1,
+        groupColumnsG2A1,
+        groupColumnsG3A1,
         groupColumnsG1A2,
         groupColumnsG1A3,
         groupColumnsG2A2,
         groupColumnsG3A2,
         groupColumnsG2A3,
-        groupColumnsG3A3
+        groupColumnsG3A3,
+
+        sumGV,
+        countGV,
+        aggG,
+        listGV
         
 
     ) where
 
 import Quark.Base.Column
 import Quark.Base.Raw
+import Quark.Base.Data
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Vector.Generic as G
+import qualified Data.Vector.Unboxed as U
+import qualified Data.Vector as V
+
+import Data.Text
 
 import Data.Hashable
 import Data.Int
@@ -57,8 +71,33 @@ type HashTable k v = H.LinearHashTable k v
 -- groupAggregate (x:[]) = groupColumns x
 -- groupAggregate (x1:x2:[]) = groupColumns2 (x1,x2) 
 
-groupColumnsG1A1 xxs f g yys = G.ifoldl' (\ !acc i x -> Map.insertWith f x (g $ yys G.! i) acc) (Map.fromList []) xxs 
-{-# INLINE groupColumnsG1A1 #-}    
+-- ok, looks like doing 2 passes one after another (or in parallel using threads even better!) is actually faster than
+-- aggregating by 2 functions in parallel in tuples in one pass.
+-- So, we just rename functions that aggregate by 1 col only and then will figure out how to combine them properly
+-- ALTHOUGH: we may want to pass THE SAME map around so that it gets filled in sequentially (won't work in parallel obviously)
+
+-- with explicit map:
+groupColumns1 xxs f g ys m = G.ifoldl' (\ !acc i x -> Map.insertWith f x (g $ ys G.! i) acc) m xxs 
+{-# INLINE groupColumns1 #-}
+
+groupColumns2 xt f g ys m = G.ifoldl' (\ !acc i x -> Map.insertWith f (mkGTuple2 xt i) (g $ ys G.! i) acc) m (fst xt) 
+{-# INLINE groupColumns2 #-}  
+
+groupColumns3 xt f g ys m = G.ifoldl' (\ !acc i x -> Map.insertWith f (mkGTuple3 xt i) (g $ ys G.! i) acc) m (sel1 xt) 
+{-# INLINE groupColumns3 #-}  
+
+
+groupColumnsG1A1 ::
+  (Eq k, G.Vector v k, G.Vector v2 r, Hashable k) =>
+  v k -> (v1 -> v1 -> v1) -> (r -> v1) -> v2 r -> Map.HashMap k v1
+groupColumnsG1A1 xxs f g ys = G.ifoldl' (\ !acc i x -> Map.insertWith f x (g $ ys G.! i) acc) Map.empty xxs 
+{-# INLINE groupColumnsG1A1 #-}
+
+groupColumnsG2A1 xt f g ys = G.ifoldl' (\ !acc i x -> Map.insertWith f (mkGTuple2 xt i) (g $ ys G.! i) acc) Map.empty (fst xt) 
+{-# INLINE groupColumnsG2A1 #-}  
+
+groupColumnsG3A1 xt f g ys = G.ifoldl' (\ !acc i x -> Map.insertWith f (mkGTuple3 xt i) (g $ ys G.! i) acc) Map.empty (sel1 xt) 
+{-# INLINE groupColumnsG3A1 #-}  
 
 -- pattern GnAm - group by n cols aggregate by m cols
 -- what to do about boilerplate?????? --> see zipFTuples and mkGTuple helper functions
@@ -75,6 +114,7 @@ groupColumnsG1A2 xs f g ys f1 g1 ys1 =
 -- So, groupby col1, col2 aggregate sum col3, count col4 will be transformed to:
 -- groupColumnsG2A2 (col1, col2) ((+), (+)) (id, const 1) (col3, col4)
 -- (as sum == (+) id while count == (+) (const 1))
+
 groupColumnsG1A2 xs ft gt yt = 
     G.ifoldl' (\ !acc i x -> Map.insertWith (zipFTuples2 ft) x (mkATuple2 gt yt i) acc) Map.empty xs 
 {-# INLINE groupColumnsG1A2 #-}  
@@ -115,6 +155,47 @@ mkGTuple2 (x1, x2) i = (x1 G.! i, x2 G.! i)
 mkGTuple3 (x1, x2, x3) i = (x1 G.! i, x2 G.! i, x3 G.! i)
 
 
+{- **************************************************************************************************** -}
+
+-- works with all num functions
+aggG :: GenericColumn -> (forall b. (Show b, Num b) => b->b->b) -> GenericColumn -> VPair
+aggG (CText xs) f (CInt ys) = MkHM $ groupColumnsG1A1 xs f id ys
+aggG (CText xs) f (CDouble ys) = MkHM $ groupColumnsG1A1 xs f id ys
+
+aggTD :: V.Vector Text -> (b->b->b) -> (Double->b) -> U.Vector Double -> Map.HashMap Text b
+aggTD = groupColumnsG1A1 
+
+sumGV :: GenericColumn -> GenericColumn -> VPair
+sumGV (CText xs) (CInt ys) = MkHM $ groupColumnsG1A1 xs (+) id ys
+sumGV (CText xs) (CDouble ys) = MkHM $ groupColumnsG1A1 xs (+) id ys
+
+listGV :: GenericColumn -> GenericColumn -> VPair
+listGV (CText xs) (CInt ys) = MkHM $ groupColumnsG1A1 xs (++) (:[]) ys
+listGV (CText xs) (CDouble ys) = MkHM $ groupColumnsG1A1 xs (++) (:[]) ys
+listGV (CText xs) (CText ys) = MkHM $ groupColumnsG1A1 xs (++) (:[]) ys
+
+
+countGV :: GenericColumn -> GenericColumn -> GenHash
+countGV (CText xs) (CInt ys) = GHInt $
+        G.ifoldl' (\ !acc i x -> Map.insertWith (+) x 1 acc) Map.empty xs
+countGV (CText xs) (CDouble ys) = GHInt $
+        G.ifoldl' (\ !acc i x -> Map.insertWith (+) x 1 acc) Map.empty xs
+countGV (CText xs) (CText ys) = GHInt $
+        G.ifoldl' (\ !acc i x -> Map.insertWith (+) x 1 acc) Map.empty xs
+
+
+data GenHash = GHInt (Map.HashMap Text Int64) | GHDouble (Map.HashMap Text Double) deriving (Show)
+
+{-
+instance AggVG Double where
+    -- aggGV :: GenericColumn -> (b->b->b) -> (Double->b) -> GenericColumn -> Map.HashMap Text b
+    aggGV (CText x) f g (CDouble y) = aggTD x f g y
+    sumGV (CText x) (CDouble y) = groupColumnsG1A1 x sum id y 
+                               where sum a b = a + b
+-}  
+    
+
+{- **************************************************************************************************** -}
 
 {-# INLINE groupColumnsFList #-}
 -- works, but has obvious limitations (aggregating columns need to be of the same type)
@@ -128,21 +209,9 @@ groupColumnsFList xxs fs gs yys =
 
 
 
--- group by 1 column, with only 1 aggregation function f to be used on column yys
-groupColumns :: forall k v v1 v2. (Eq k, G.Vector v k, G.Vector v2 v1, Hashable k) =>
-     v k -> (v1 -> v1 -> v1) -> v2 v1 -> Map.HashMap k v1
-groupColumns xxs f yys = G.ifoldl' (\ !acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
-{-# INLINE groupColumns #-}    
 
 groupColumnsST xxs f yys = ifoldlST (\ !acc i x -> Map.insertWith f x (yys G.! i) acc) (Map.fromList []) xxs 
 {-# INLINE groupColumnsST #-}    
-
--- group by 2 columns, with only 1 aggregation function
-groupColumns2 (x1,x2) f ws = G.ifoldl' (\ !acc i x -> Map.insertWith f (x, (x2 G.! i)) (ws G.! i) acc) (Map.fromList []) x1
-{-# INLINE groupColumns2 #-}
--- group by 3 columns, with only 1 aggregation function -- etc...
-groupColumns3 (x1,x2,x3) f ws = G.ifoldl' (\ !acc i x -> Map.insertWith f (x, (x2 G.! i), (x3 G.! i)) (ws G.! i) acc) (Map.fromList []) x1 
-{-# INLINE groupColumns3 #-}
 
 {-# INLINE groupColumnsH #-}    
 groupColumnsH :: (Eq k, G.Vector v k, G.Vector v1 v2, Hashable k) =>
@@ -157,16 +226,14 @@ groupColumnsH xs f ys = do
             Nothing -> H.insert ht x y
     return ht
 
-groupColumns'' :: GenericVector -> (forall a. a->a->a) -> GenericVector -> IO()
-groupColumns'' (GenericVector v) f (GenericVector w) = 
-    do let res = groupColumns v f w
-       putStrLn $ show res
 
+{-
 groupColumns' :: GenericVector -> (forall a. Num a => a->a->a) -> NumericVector -> IO()
 groupColumns' (GenericVector v) f (NumericVector w) = 
     do let res = groupColumns v f w
        putStrLn $ show res
 
+-}
 {- right fold performs worse
 groupColumns3R (x,y,z) f ws = G.ifoldr' (\i x acc -> Map.insertWith f (x, (y G.! i), (z G.! i)) (ws G.! i) acc) (Map.fromList []) x 
 -}

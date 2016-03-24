@@ -86,7 +86,6 @@ data GenericColumn = CInt CInt | CDouble CDouble
 -- encoded text column for faster processing (encodedCol is a column with ints that correspond to position of string in the values vector)
 data ConvertedTextColumn = ConvertedTextColumn { encodedCol :: CInt, values :: CText}
 
-
 -- heterogenous vectors!!! based on existentials
 data VH = forall v a. (Eq a, Hashable a, G.Vector v a, Show (v a), Show a) => VH (v a)
 data VP = forall a. (Show a, U.Unbox a) => VP a
